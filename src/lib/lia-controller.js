@@ -31,7 +31,7 @@ export const DOCUMENTATION_UNAVAILABLE_MESSAGE = `## پاسخ
 
 در حال حاضر خواندن Documentation داخلی لیارا در دسترس نیست؛ بنابراین برای جلوگیری از ارائهٔ اطلاعات نادرست، پاسخ قطعی نمی‌دهم. لطفاً کمی بعد دوباره تلاش کنید.`;
 
-export const OUT_OF_SCOPE_MESSAGE = "من توانایی پاسخ به این سوال را ندارم.";
+export const OUT_OF_SCOPE_MESSAGE = "من فقط دربارهٔ سرویس‌های لیارا و مفاهیم فنی مرتبط کمک می‌کنم. اگر سؤال فنی یا مربوط به لیارا داری، خوشحال می‌شم راهنماییت کنم.";
 
 export const PROBABLE_FALLBACK_NOTICE = `## پاسخ احتمالی و غیرمستند
 
@@ -104,8 +104,18 @@ function hasImageAttachment(messages) {
 
 const IN_SCOPE_PATTERN = /(?:هوش مصنوعی|یادگیری ماشین|یادگیری ماشینی|مدل زبان|چت‌?بات|الگوریتم|پرامپت|توکن|پردازش متن|تکنولوژی|فناوری|کامپیوتر|رایانه|برنامه‌نویسی|برنامه نویسی|کدنویسی|کد|پایتون|جاوااسکریپت|تایپ‌?اسکریپت|جاوا|php|node(?:\.js)?|react|next(?:\.js)?|vue|sql|api|sdk|http|سرور|کلود|ابری|دیتابیس|پایگاه داده|داده|شبکه|امنیت|رمزنگاری|لینوکس|ویندوز|گیت|docker|کانتینر|استقرار|دیپلوی|deploy|دامنه|dns|وب‌?سایت|سایت|اپلیکیشن|نرم‌افزار|نرم افزار|لینک|فایل|خطا|ارور|لاگ|پایگاه دانش|مستندات|documentation|لیارا|liara|پنل|حساب کاربری|سرویس|صورتحساب|فاکتور|ذخیره‌?سازی|پشتیبان|بکاپ|redis|mysql|mongodb|postgres|آی‌?پی|پورت|ssl|tls|ssh|cors|cdn|github|gitlab|اسکرین‌?شات|screenshot)/iu;
 
+const GENERAL_TECHNICAL_EXPLANATION_PATTERN = /(?:چیست|چیستند|یعنی چه|چه تفاوتی|تفاوت|تعریف|معنی|چگونه کار می\s*کند|چطور کار می\s*کند|توضیح بده|معرفی کن|what is|what are|difference between|how does .* work)/iu;
+const LIARA_SPECIFIC_PATTERN = /(?:لیارا|liara|پنل|قیمت|پلن|صورتحساب|فاکتور|سرویس لیارا|مستندات لیارا|حساب کاربری|دامنه\s*من|دامنه\s*ام|اپلیکیشن\s*من|برنامه\s*ام|در لیارا|روی لیارا)/iu;
+
 export function isLikelyInScope(query) {
   return IN_SCOPE_PATTERN.test(normalizeText(query));
+}
+
+function isGeneralTechnicalQuery(query) {
+  const normalizedQuery = normalizeText(query);
+  return isLikelyInScope(normalizedQuery)
+    && GENERAL_TECHNICAL_EXPLANATION_PATTERN.test(normalizedQuery)
+    && !LIARA_SPECIFIC_PATTERN.test(normalizedQuery);
 }
 
 function hasInsufficientDescription(query) {
@@ -135,6 +145,10 @@ export async function createLiaControllerPlan(messages) {
   }
 
   if (hasImageAttachment(messages)) {
+    return { mode: LIA_STAGES.PROBABLE, stage: LIA_STAGES.PROBABLE, query, hits: [] };
+  }
+
+  if (isGeneralTechnicalQuery(query)) {
     return { mode: LIA_STAGES.PROBABLE, stage: LIA_STAGES.PROBABLE, query, hits: [] };
   }
 
