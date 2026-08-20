@@ -46,17 +46,37 @@ export function useChatHistory() {
   const [hydrated, setHydrated] = useState(false);
 
   useEffect(() => {
-    try {
-      const raw = window.localStorage.getItem(STORAGE_KEY);
-      const activeId = window.localStorage.getItem(ACTIVE_KEY);
-      if (raw) setHistory(parseHistory(raw));
-      setActiveChatIdState(activeId || null);
-    } catch {
-      window.localStorage.removeItem(STORAGE_KEY);
-      window.localStorage.removeItem(ACTIVE_KEY);
-    } finally {
-      setHydrated(true);
-    }
+    const load = async () => {
+      try {
+        const response = await fetch("/api/chats");
+        if (!response.ok) throw new Error("chat-api-unavailable");
+        const result = await response.json();
+        const nextHistory = parseHistory(JSON.stringify(result.chats || []));
+        const localRaw = window.localStorage.getItem(STORAGE_KEY);
+        const localHistory = localRaw ? parseHistory(localRaw) : [];
+        const historyToUse = nextHistory.length ? nextHistory : localHistory;
+        setHistory(historyToUse);
+        setActiveChatIdState(historyToUse[0]?.id || null);
+        window.localStorage.setItem(STORAGE_KEY, JSON.stringify(historyToUse));
+        if (historyToUse[0]?.id) window.localStorage.setItem(ACTIVE_KEY, historyToUse[0].id);
+        if (!nextHistory.length) {
+          localHistory.forEach((chat) => fetch("/api/chats", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ chat }) }).catch(() => {}));
+        }
+      } catch {
+        try {
+          const raw = window.localStorage.getItem(STORAGE_KEY);
+          const activeId = window.localStorage.getItem(ACTIVE_KEY);
+          if (raw) setHistory(parseHistory(raw));
+          setActiveChatIdState(activeId || null);
+        } catch {
+          window.localStorage.removeItem(STORAGE_KEY);
+          window.localStorage.removeItem(ACTIVE_KEY);
+        }
+      } finally {
+        setHydrated(true);
+      }
+    };
+    load();
   }, []);
 
   const persist = useCallback((nextHistory) => {
@@ -93,6 +113,11 @@ export function useChatHistory() {
     };
     const nextHistory = [nextChat, ...history.filter((chat) => chat.id !== id)];
     persist(nextHistory);
+    fetch("/api/chats", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ chat: nextChat }),
+    }).catch(() => {});
     if (!activeChatId) setActiveChatId(id);
     return id;
   }, [activeChatId, history, persist, setActiveChatId]);
@@ -112,12 +137,15 @@ export function useChatHistory() {
       } catch {
         // Ignore storage failures; the in-memory title remains usable.
       }
+      const chat = nextHistory.find((item) => item.id === id);
+      if (chat) fetch("/api/chats", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ chat }) }).catch(() => {});
       return nextHistory;
     });
   }, []);
 
   const deleteChat = useCallback((id) => {
     persist(history.filter((chat) => chat.id !== id));
+    fetch("/api/chats", { method: "DELETE", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ id }) }).catch(() => {});
     if (activeChatId === id) setActiveChatId(null);
   }, [activeChatId, history, persist, setActiveChatId]);
 

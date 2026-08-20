@@ -21,9 +21,37 @@ model User {
   createdAt    DateTime  @default(now())
   updatedAt    DateTime  @updatedAt
   sessions     Session[]
+  chats        Chat[]
 
   @@index([role])
   @@index([isActive])
+}
+
+model Chat {
+  id             String    @id
+  title          String
+  titleGenerated Boolean   @default(false)
+  ownerTokenHash String?
+  userId         String?
+  createdAt      DateTime  @default(now())
+  updatedAt      DateTime  @updatedAt
+  user           User?     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  messages       Message[]
+
+  @@index([userId])
+  @@index([ownerTokenHash])
+  @@index([updatedAt])
+}
+
+model Message {
+  id        String   @id
+  chatId    String
+  role      String
+  parts     Json
+  createdAt DateTime @default(now())
+  chat      Chat     @relation(fields: [chatId], references: [id], onDelete: Cascade)
+
+  @@index([chatId, createdAt])
 }
 
 model Session {

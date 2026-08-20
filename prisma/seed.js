@@ -13,10 +13,11 @@ async function main() {
   if (!isValidEmail(email) || !password) throw new Error("ADMIN_EMAIL and ADMIN_PASSWORD are required for seeding");
   if (password.length < 8) throw new Error("ADMIN_PASSWORD must be at least 8 characters");
 
+  const passwordHash = await hashPassword(password);
   await prisma.user.upsert({
     where: { email },
-    update: { name: "مدیر لیارا", passwordHash: await hashPassword(password), role: "ADMIN", isActive: true },
-    create: { email, name: "مدیر لیارا", passwordHash: await hashPassword(password), role: "ADMIN" },
+    update: { name: "مدیر لیارا", passwordHash, role: "ADMIN", isActive: true },
+    create: { email, name: "مدیر لیارا", passwordHash, role: "ADMIN" },
   });
 }
 
