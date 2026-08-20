@@ -14,6 +14,7 @@ import debounce from "lodash.debounce";
 import { useRouter } from "next/router";
 import UAParser from "ua-parser-js";
 import Link from "next/link";
+import { useTheme } from "next-themes";
 
 const client = new MeiliSearch({
   host: "https://search.liara.ir",
@@ -31,15 +32,7 @@ const Header = ({ setShowSidebar }) => {
   const router = useRouter();
   const valueRef = useRef();
 
-  const isBrowser = typeof window !== "undefined";
-
-  const [darkMode, setDarkMode] = useState(() => {
-    if (isBrowser) {
-      const storedDarkMode = localStorage.getItem("dark");
-      return storedDarkMode ? JSON.parse(storedDarkMode) : false;
-    }
-    return false;
-  });
+  const { resolvedTheme, setTheme } = useTheme();
 
   useEffect(() => {
     const handleKeydown = (event) => {
@@ -57,18 +50,8 @@ const Header = ({ setShowSidebar }) => {
     };
   }, []);
 
-  useEffect(() => {
-    if (darkMode) {
-      document.documentElement.classList.add("dark");
-    } else {
-      document.documentElement.classList.remove("dark");
-    }
-    localStorage.setItem("dark", JSON.stringify(darkMode));
-  }, [darkMode]);
-
   const toggleDarkMode = () => {
-    const newMode = !darkMode;
-    setDarkMode(newMode);
+    setTheme(resolvedTheme === "dark" ? "light" : "dark");
   };
 
   const handleMeiliSearch = (value) => {
@@ -189,10 +172,13 @@ const Header = ({ setShowSidebar }) => {
           onClick={toggleDarkMode}
           className="text-[18px]  absolute md:hidden left-14 hover:bg-[#0001] transition-all p-1 rounded-full"
         >
-          {darkMode ? <GoMoon /> : <GoSun />}
+          {resolvedTheme === "dark" ? <GoMoon /> : <GoSun />}
         </button>
 
         <div className="hidden md:flex items-center gap-3 ">
+          <Link href="/">
+            <Button>هوش مصنوعی</Button>
+          </Link>
           <a href="https://console.liara.ir" target="_blank">
             <Button>ورود به پنل کاربری</Button>
           </a>
@@ -200,7 +186,7 @@ const Header = ({ setShowSidebar }) => {
             onClick={toggleDarkMode}
             className="text-[18px]  hover:bg-[#0001] transition-all p-1 rounded-full"
           >
-            {darkMode ? <GoMoon /> : <GoSun />}
+            {resolvedTheme === "dark" ? <GoMoon /> : <GoSun />}
           </button>
         </div>
       </nav>
@@ -297,3 +283,5 @@ const Header = ({ setShowSidebar }) => {
 };
 
 export default Header;
+
+

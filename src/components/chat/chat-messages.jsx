@@ -38,3 +38,10 @@ export function ChatMessages({ messages, status, onRetry, playSound }) {
     </ScrollArea>
   );
 }
+
+
+
+
+
+
+

@@ -34,3 +34,10 @@ export function ChatMessage({ message, onRetry, playSound, isStreaming }) {
 }
 
 export { messageText };
+
+
+
+
+
+
+

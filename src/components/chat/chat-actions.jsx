@@ -57,3 +57,10 @@ export function ChatActions({ content, onRetry, playSound }) {
     </TooltipProvider>
   );
 }
+
+
+
+
+
+
+

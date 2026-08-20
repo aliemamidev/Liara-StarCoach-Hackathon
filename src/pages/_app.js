@@ -10,7 +10,7 @@ import { DirectionProvider } from "@/components/ui/direction";
 
 export default function App({ Component, pageProps }) {
   return (
-    <ThemeProvider attribute="class" defaultTheme="system" enableSystem>
+    <ThemeProvider attribute="class" defaultTheme="system" enableSystem storageKey="liara-theme">
       <DirectionProvider dir="rtl">
         <MDXProvider>
           <Component {...pageProps} />
@@ -19,3 +19,5 @@ export default function App({ Component, pageProps }) {
     </ThemeProvider>
   );
 }
+
+

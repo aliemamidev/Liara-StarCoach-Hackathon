@@ -12,3 +12,10 @@ export const Switch = ({ className, ...props }) => (
     <SwitchPrimitive.Thumb className="pointer-events-none block h-5 w-5 rounded-full bg-white shadow-sm transition-transform data-[state=checked]:translate-x-[-20px] data-[state=unchecked]:translate-x-0" />
   </SwitchPrimitive.Root>
 );
+
+
+
+
+
+
+

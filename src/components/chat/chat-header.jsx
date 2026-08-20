@@ -1,4 +1,5 @@
-import { Settings2 } from "lucide-react";
+
+import { History, Settings2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import {
   Tooltip,
@@ -7,7 +8,8 @@ import {
   TooltipTrigger,
 } from "@/components/ui/tooltip";
 
-export function ChatHeader({ onOpenSettings }) {
+
+export function ChatHeader({ onOpenSettings, onOpenHistory }) {
   return (
     <header className="chat-header">
       <div className="flex items-center gap-3">
@@ -21,21 +23,32 @@ export function ChatHeader({ onOpenSettings }) {
           <p className="text-xs text-[hsl(var(--chat-muted))]">همراه شما برای پاسخ‌های فنی</p>
         </div>
       </div>
-      <TooltipProvider delayDuration={250}>
-        <Tooltip>
-          <TooltipTrigger asChild>
-            <Button
-              variant="ghost"
-              size="icon"
-              aria-label="باز کردن تنظیمات"
-              onClick={onOpenSettings}
-            >
-              <Settings2 size={19} aria-hidden="true" />
-            </Button>
-          </TooltipTrigger>
-          <TooltipContent>تنظیمات</TooltipContent>
-        </Tooltip>
-      </TooltipProvider>
+
+      <div className="flex items-center gap-1">
+        <TooltipProvider delayDuration={250}>
+          <Tooltip>
+            <TooltipTrigger asChild>
+              <Button variant="ghost" size="icon" aria-label="باز کردن تاریخچه" onClick={onOpenHistory}>
+                <History size={19} aria-hidden="true" />
+              </Button>
+            </TooltipTrigger>
+            <TooltipContent>تاریخچه</TooltipContent>
+          </Tooltip>
+          <Tooltip>
+            <TooltipTrigger asChild>
+              <Button variant="ghost" size="icon" aria-label="باز کردن تنظیمات" onClick={onOpenSettings}>
+                <Settings2 size={19} aria-hidden="true" />
+              </Button>
+            </TooltipTrigger>
+            <TooltipContent>تنظیمات</TooltipContent>
+          </Tooltip>
+        </TooltipProvider>
+      </div>
     </header>
   );
 }
+
+
+
+
+

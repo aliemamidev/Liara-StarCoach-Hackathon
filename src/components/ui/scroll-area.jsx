@@ -14,3 +14,10 @@ export function ScrollArea({ className, children, ...props }) {
     </ScrollAreaPrimitive.Root>
   );
 }
+
+
+
+
+
+
+
