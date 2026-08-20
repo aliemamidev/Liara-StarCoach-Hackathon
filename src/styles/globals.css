@@ -666,6 +666,29 @@ pre code {
   margin: 0 auto;
 }
 
+.chat-messages-wrap {
+  position: relative;
+  width: min(100%, 820px);
+  min-height: 0;
+  flex: 1;
+  margin: 0 auto;
+}
+
+.chat-messages-wrap .chat-messages {
+  width: 100%;
+}
+
+.chat-jump-to-latest {
+  position: absolute;
+  right: 50%;
+  bottom: 14px;
+  transform: translateX(50%);
+  gap: 6px;
+  border-radius: 999px;
+  background: hsl(var(--chat-surface) / 0.96);
+  box-shadow: 0 8px 24px hsl(var(--chat-text) / 0.12);
+}
+
 .chat-message-list {
   display: flex;
   flex-direction: column;
@@ -791,6 +814,11 @@ pre code {
 .chat-speech-button.is-reading {
   color: hsl(var(--chat-accent));
   background: hsl(var(--chat-accent) / 0.12);
+}
+
+.chat-speech-error {
+  color: hsl(0 65% 48%);
+  font-size: 11px;
 }
 
 .chat-composer textarea {

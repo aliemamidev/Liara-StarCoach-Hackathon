@@ -29,6 +29,7 @@ export function ChatLayout() {
   const { hydrated, activeChatId, history, renameChat } = chatHistory;
   const loadedChatRef = useRef(null);
   const titleRequestsRef = useRef(new Set());
+  const liveResponseRef = useRef(false);
   const saveMessagesRef = useRef(chatHistory.saveMessages);
   saveMessagesRef.current = chatHistory.saveMessages;
   const transport = useMemo(() => new DefaultChatTransport({ api: "/api/chat" }), []);
@@ -70,6 +71,7 @@ export function ChatLayout() {
   function submitMessage(value = input) {
     const trimmed = value.trim();
     if ((!trimmed && !files.length) || status === "submitted" || status === "streaming") return;
+    liveResponseRef.current = true;
     sendMessage({ text: trimmed, files });
     setInput("");
     setFiles([]);
@@ -83,6 +85,7 @@ export function ChatLayout() {
 
   function startNewChat() {
     titleRequestsRef.current.clear();
+    liveResponseRef.current = false;
     chatHistory.setActiveChatId(null);
     setMessages([]);
     setFiles([]);
@@ -93,6 +96,7 @@ export function ChatLayout() {
   function selectChat(id) {
     const chat = chatHistory.history.find((item) => item.id === id);
     if (!chat) return;
+    liveResponseRef.current = false;
     chatHistory.setActiveChatId(id);
     setMessages(chat.messages);
     setFiles([]);
@@ -125,7 +129,7 @@ export function ChatLayout() {
         {messages.length === 0 ? (
           <ChatEmptyState onSuggestion={submitMessage} />
         ) : (
-          <ChatMessages messages={messages} status={status} onRetry={retry} playSound={sound.playSound} />
+          <ChatMessages messages={messages} status={status} onRetry={retry} playSound={sound.playSound} isLive={liveResponseRef.current} />
         )}
         {error && (
           <div className="chat-error" role="alert">
@@ -172,5 +176,3 @@ export function ChatLayout() {
     </main>
   );
 }
-
-

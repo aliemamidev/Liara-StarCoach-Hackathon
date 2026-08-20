@@ -13,10 +13,13 @@ export function ChatActions({ content, onRetry, playSound }) {
   const [speechStatus, setSpeechStatus] = useState("ready");
   const speechStatusRef = useRef("ready");
   const speechIdRef = useRef(`speech-${Math.random().toString(36).slice(2)}`);
+  const speechRequestRef = useRef(0);
 
   useEffect(() => {
     function stopWhenAnotherMessageStarts(event) {
       if (event.detail !== speechIdRef.current) {
+        speechRequestRef.current += 1;
+        window.speechSynthesis?.cancel();
         speechStatusRef.current = "stopped";
         setSpeechStatus("stopped");
       }
@@ -25,9 +28,8 @@ export function ChatActions({ content, onRetry, playSound }) {
     window.addEventListener("chat:speech-start", stopWhenAnotherMessageStarts);
     return () => {
       window.removeEventListener("chat:speech-start", stopWhenAnotherMessageStarts);
-      if (speechStatusRef.current === "reading") {
-        window.speechSynthesis?.cancel();
-      }
+      speechRequestRef.current += 1;
+      window.speechSynthesis?.cancel();
     };
   }, []);
 
@@ -36,26 +38,72 @@ export function ChatActions({ content, onRetry, playSound }) {
     setSpeechStatus(status);
   }
 
-  function speakMessage() {
+  function waitForVoices() {
+    const currentVoices = window.speechSynthesis.getVoices();
+    if (currentVoices.length) return Promise.resolve(currentVoices);
+    return new Promise((resolve) => {
+      const finish = () => {
+        window.clearTimeout(timeout);
+        window.speechSynthesis.removeEventListener("voiceschanged", finish);
+        resolve(window.speechSynthesis.getVoices());
+      };
+      const timeout = window.setTimeout(finish, 700);
+      window.speechSynthesis.addEventListener("voiceschanged", finish, { once: true });
+    });
+  }
+
+  function splitSpeech(text) {
+    const sentences = text.match(/[^.!?؟؛\n]+[.!?؟؛\n]*/g) || [text];
+    const chunks = [];
+    sentences.forEach((sentence) => {
+      for (let index = 0; index < sentence.length; index += 220) chunks.push(sentence.slice(index, index + 220));
+    });
+    return chunks.filter(Boolean);
+  }
+
+  async function speakMessage() {
     if (typeof window === "undefined" || !("speechSynthesis" in window) || !("SpeechSynthesisUtterance" in window)) {
       updateSpeechStatus("error");
       return;
     }
 
+    const requestId = speechRequestRef.current + 1;
+    speechRequestRef.current = requestId;
     window.speechSynthesis.cancel();
     window.dispatchEvent(new CustomEvent("chat:speech-start", { detail: speechIdRef.current }));
-
-    const utterance = new window.SpeechSynthesisUtterance(content);
-    utterance.lang = "fa-IR";
-    utterance.rate = 1;
-    utterance.onend = () => updateSpeechStatus("stopped");
-    utterance.onerror = () => updateSpeechStatus("error");
+    const voices = await waitForVoices();
+    if (speechRequestRef.current !== requestId) return;
+    const voice = voices.find((item) => item.lang.toLowerCase() === "fa-ir")
+      || voices.find((item) => item.lang.toLowerCase().startsWith("fa"));
+    if (!voice) {
+      updateSpeechStatus("error");
+      return;
+    }
+    const chunks = splitSpeech(content);
+    let index = 0;
+    const speakNext = () => {
+      if (speechRequestRef.current !== requestId) return;
+      if (index >= chunks.length) {
+        updateSpeechStatus("stopped");
+        return;
+      }
+      const utterance = new window.SpeechSynthesisUtterance(chunks[index]);
+      utterance.lang = voice.lang;
+      utterance.voice = voice;
+      utterance.rate = 0.95;
+      utterance.onend = () => { index += 1; speakNext(); };
+      utterance.onerror = () => {
+        if (speechRequestRef.current === requestId) updateSpeechStatus("error");
+      };
+      window.speechSynthesis.speak(utterance);
+    };
     updateSpeechStatus("reading");
-    window.speechSynthesis.speak(utterance);
+    speakNext();
   }
 
   function handleSpeechClick() {
     if (speechStatus === "reading") {
+      speechRequestRef.current += 1;
       window.speechSynthesis?.cancel();
       updateSpeechStatus("stopped");
       return;
@@ -92,6 +140,11 @@ export function ChatActions({ content, onRetry, playSound }) {
           </TooltipTrigger>
           <TooltipContent>{copied ? "کپی شد" : "کپی"}</TooltipContent>
         </Tooltip>
+        {speechStatus === "error" && (
+          <span className="chat-speech-error" role="status">
+            صدای فارسی روی این دستگاه نصب یا فعال نیست
+          </span>
+        )}
         <Tooltip>
           <TooltipTrigger asChild>
             <Button
@@ -101,8 +154,8 @@ export function ChatActions({ content, onRetry, playSound }) {
               aria-label={
                 speechStatus === "reading"
                   ? "توقف خواندن"
-                  : speechStatus === "error"
-                    ? "خطا در خواندن صوتی"
+              : speechStatus === "error"
+                    ? "صدای فارسی در مرورگر پیدا نشد"
                     : speechStatus === "stopped"
                       ? "شروع دوباره خواندن"
                       : "خواندن پاسخ با صدا"
@@ -115,8 +168,8 @@ export function ChatActions({ content, onRetry, playSound }) {
           <TooltipContent>
             {speechStatus === "reading"
               ? "توقف خواندن"
-              : speechStatus === "error"
-                ? "خواندن صوتی در این مرورگر در دسترس نیست"
+                : speechStatus === "error"
+                ? "صدای فارسی روی این دستگاه نصب یا فعال نیست"
                 : speechStatus === "stopped"
                   ? "شروع دوباره خواندن"
                   : "خواندن با صدا"}
@@ -140,8 +193,6 @@ export function ChatActions({ content, onRetry, playSound }) {
     </TooltipProvider>
   );
 }
-
-
 
 
 

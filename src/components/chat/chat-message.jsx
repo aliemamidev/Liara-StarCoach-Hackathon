@@ -1,4 +1,5 @@
 import { ChatActions } from "@/components/chat/chat-actions";
+import { useEffect, useRef, useState } from "react";
 
 function messageText(message) {
   return (message.parts || [])
@@ -7,15 +8,59 @@ function messageText(message) {
     .join("");
 }
 
-export function ChatMessage({ message, onRetry, playSound, isStreaming }) {
+export function ChatMessage({ message, onRetry, playSound, isStreaming, isLive }) {
   const content = messageText(message);
   const isUser = message.role === "user";
   const attachments = (message.parts || []).filter((part) => part.type === "file" && part.url);
+  const [displayedContent, setDisplayedContent] = useState(() => (isLive ? "" : content));
+  const [isRevealing, setIsRevealing] = useState(isLive);
+  const displayedContentRef = useRef(displayedContent);
+  const targetContentRef = useRef(content);
+  const frameRef = useRef(null);
+
+  useEffect(() => {
+    targetContentRef.current = content;
+    if (!isLive) {
+      displayedContentRef.current = content;
+      setDisplayedContent(content);
+      setIsRevealing(false);
+      return undefined;
+    }
+
+    setIsRevealing(displayedContentRef.current !== content);
+    let lastPaint = 0;
+    const reveal = (timestamp) => {
+      const current = displayedContentRef.current;
+      const target = targetContentRef.current;
+      if (current.length >= target.length) {
+        setIsRevealing(false);
+        frameRef.current = null;
+        return;
+      }
+      if (timestamp - lastPaint >= 22) {
+        const backlog = target.length - current.length;
+        const step = Math.max(1, Math.min(5, Math.ceil(backlog / 18)));
+        const next = target.slice(0, current.length + step);
+        displayedContentRef.current = next;
+        setDisplayedContent(next);
+        lastPaint = timestamp;
+      }
+      frameRef.current = requestAnimationFrame(reveal);
+    };
+    frameRef.current = requestAnimationFrame(reveal);
+    return () => {
+      if (frameRef.current) cancelAnimationFrame(frameRef.current);
+      frameRef.current = null;
+    };
+  }, [content, isLive]);
+
+  const renderedContent = isLive ? displayedContent : content;
+  const canUseActions = !isUser && renderedContent && (!isLive || (!isRevealing && renderedContent === content)) && !isStreaming;
 
   return (
     <article className={isUser ? "chat-message chat-message-user" : "chat-message chat-message-assistant"}>
       <div className="chat-message-label">{isUser ? "شما" : "دستیار لیارا"}</div>
-      <div className="chat-message-content">{content || (isStreaming ? "" : "پاسخی دریافت نشد.")}</div>
+      <div className="chat-message-content">{renderedContent || (isStreaming ? "" : "پاسخی دریافت نشد.")}</div>
       {attachments.length > 0 && (
         <div className="chat-message-attachments">
           {attachments.map((attachment, index) => (
@@ -26,15 +71,14 @@ export function ChatMessage({ message, onRetry, playSound, isStreaming }) {
           ))}
         </div>
       )}
-      {!isUser && content && !isStreaming && (
-        <ChatActions content={content} onRetry={onRetry} playSound={playSound} />
+      {canUseActions && (
+        <ChatActions content={renderedContent} onRetry={onRetry} playSound={playSound} />
       )}
     </article>
   );
 }
 
 export { messageText };
-
 
 
 
