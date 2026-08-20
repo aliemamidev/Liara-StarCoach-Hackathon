@@ -1,5 +1,5 @@
 import { AlertCircle, Check, Clipboard, LoaderCircle, RotateCcw, Square, Volume2 } from "lucide-react";
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useId, useRef, useState } from "react";
 import { Button } from "@/components/ui/button";
 import {
   Tooltip,
@@ -23,7 +23,7 @@ export function ChatActions({ content, onRetry, playSound }) {
   const [copied, setCopied] = useState(false);
   const [speechStatus, setSpeechStatus] = useState("ready");
   const speechStatusRef = useRef("ready");
-  const speechIdRef = useRef(`speech-${Math.random().toString(36).slice(2)}`);
+  const speechId = useId();
   const speechRequestRef = useRef(0);
   const abortControllerRef = useRef(null);
   const audioRef = useRef(null);
@@ -32,7 +32,7 @@ export function ChatActions({ content, onRetry, playSound }) {
   useEffect(() => {
     const objectUrls = objectUrlsRef.current;
     function stopWhenAnotherMessageStarts(event) {
-      if (event.detail === speechIdRef.current) return;
+      if (event.detail === speechId) return;
       speechRequestRef.current += 1;
       abortControllerRef.current?.abort();
       audioRef.current?.pause();
@@ -50,7 +50,7 @@ export function ChatActions({ content, onRetry, playSound }) {
       objectUrls.forEach((url) => URL.revokeObjectURL(url));
       objectUrls.clear();
     };
-  }, []);
+  }, [speechId]);
 
   function updateSpeechStatus(status) {
     speechStatusRef.current = status;
@@ -85,7 +85,7 @@ export function ChatActions({ content, onRetry, playSound }) {
     const requestId = speechRequestRef.current;
     const controller = new AbortController();
     abortControllerRef.current = controller;
-    window.dispatchEvent(new CustomEvent("chat:speech-start", { detail: speechIdRef.current }));
+    window.dispatchEvent(new CustomEvent("chat:speech-start", { detail: speechId }));
     updateSpeechStatus("preparing");
 
     try {
