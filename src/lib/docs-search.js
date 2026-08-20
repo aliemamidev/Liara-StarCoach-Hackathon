@@ -1,13 +1,16 @@
 import fs from "node:fs/promises";
 import path from "node:path";
+import MeiliSearch from "meilisearch";
 
 const MAX_RESULTS = 5;
 const MAX_BODY_LENGTH = 6500;
 const DOCUMENTATION_ROOTS = ["public/llms", "src/pages"];
+const ONLINE_INDEX = "docs";
 let documentsPromise;
+let onlineClient;
 
 function normalizeText(value) {
-  return value.replace(/[يى]/g, "ی").replace(/ك/g, "ک").replace(/\u200c/g, " ").replace(/\s+/g, " ").trim();
+  return String(value || "").replace(/[يى]/g, "ی").replace(/ك/g, "ک").replace(/\u200c/g, " ").replace(/\s+/g, " ").trim();
 }
 
 function tokens(value) {
@@ -81,9 +84,47 @@ export async function searchDocumentation(query) {
     documentsPromise ||= loadDocuments();
     const documents = await documentsPromise;
     const queryTokens = [...new Set(tokens(query))];
-    const hits = documents.map((document) => scoreDocument(document, query, queryTokens)).filter(({ coverage, score }) => coverage > 0 || score > 0).sort((a, b) => b.score - a.score).slice(0, MAX_RESULTS).map(({ document }) => ({ title: document.title, path: document.path, url: document.url, section: document.title, body: document.body.slice(0, MAX_BODY_LENGTH) }));
+    const hits = documents.map((document) => scoreDocument(document, query, queryTokens)).filter(({ coverage, score }) => coverage > 0 || score > 0).sort((a, b) => b.score - a.score).slice(0, MAX_RESULTS).map(({ document, score, coverage }) => ({ title: document.title, path: document.path, url: document.url, section: document.title, body: document.body.slice(0, MAX_BODY_LENGTH), score, coverage }));
     return { available: true, hits };
   } catch { return { available: false, hits: [] }; }
+}
+
+function getOnlineClient() {
+  if (onlineClient) return onlineClient;
+  const host = process.env.LIARA_DOCS_SEARCH_URL;
+  if (!host) return null;
+  const options = { host: host.replace(/\/$/, "") };
+  if (process.env.LIARA_DOCS_SEARCH_KEY) options.apiKey = process.env.LIARA_DOCS_SEARCH_KEY;
+  onlineClient = new MeiliSearch(options);
+  return onlineClient;
+}
+
+function onlineHitToDocumentation(hit) {
+  const title = normalizeText(hit.title || hit.name || "Documentation لیارا");
+  const body = normalizeText(hit.body || hit.content || hit.description || "");
+  return {
+    title,
+    path: hit.path || "",
+    url: hit.url || "https://docs.liara.ir/",
+    section: normalizeText(hit.element || hit.section || title),
+    body: body.slice(0, MAX_BODY_LENGTH),
+    platform: hit.platform,
+    element: hit.element,
+    type: hit.type,
+    src: hit.src,
+  };
+}
+
+export async function searchDocumentationOnline(query) {
+  if (!query?.trim()) return { available: true, hits: [] };
+  const client = getOnlineClient();
+  if (!client) return { available: false, hits: [] };
+  try {
+    const result = await client.index(ONLINE_INDEX).search(query, { limit: MAX_RESULTS });
+    return { available: true, hits: (result.hits || []).map(onlineHitToDocumentation) };
+  } catch {
+    return { available: false, hits: [] };
+  }
 }
 
 export function formatDocumentationContext(hits) {

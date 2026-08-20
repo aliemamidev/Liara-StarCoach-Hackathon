@@ -6,28 +6,9 @@ import {
   streamText,
 } from "ai";
 import { getAiConfig, isAiConfigured } from "@/lib/ai-config";
-import { formatDocumentationContext, formatDocumentationSources, searchDocumentation } from "@/lib/docs-search";
-import { LIA_SYSTEM_PROMPT } from "@/lib/lia-persona";
-
-const NO_DOCUMENTATION_MESSAGE = `## پاسخ
-
-در Documentation فعلی لیارا اطلاعات کافی برای پاسخ دقیق به این پرسش پیدا نکردم. لطفاً نام محصول یا سرویس، پلتفرم، نسخه، متن خطا یا Screenshot مربوط به مشکل را ارسال کنید تا بتوانم دقیق‌تر بررسی کنم.
-
-## منبع پاسخ
-
-📄 Documentation:
-
-- منبع مرتبطی در Documentation فعلی پیدا نشد.`;
-
-const DOCUMENTATION_UNAVAILABLE_MESSAGE = `## پاسخ
-
-در حال حاضر خواندن Documentation داخلی در دسترس نیست؛ بنابراین برای جلوگیری از ارائهٔ اطلاعات نادرست، پاسخ قطعی نمی‌دهم. لطفاً کمی بعد دوباره تلاش کنید.
-
-## منبع پاسخ
-
-📄 Documentation داخلی:
-
-- خواندن فایل‌های Documentation پروژه ممکن نشد.`;
+import { formatDocumentationContext, formatDocumentationSources } from "@/lib/docs-search";
+import { createLiaControllerPlan, CLARIFICATION_MESSAGE, DOCUMENTATION_UNAVAILABLE_MESSAGE, LIA_STAGES, PROBABLE_FALLBACK_NOTICE, validateLiaDraft } from "@/lib/lia-controller";
+import { LIA_PROBABLE_SYSTEM_PROMPT, LIA_SYSTEM_PROMPT } from "@/lib/lia-persona";
 
 function validMessages(messages) {
   return (
@@ -46,26 +27,36 @@ function validMessages(messages) {
   );
 }
 
-function latestUserText(messages) {
-  const latestUserMessage = [...messages].reverse().find((message) => message.role === "user");
-  return (latestUserMessage?.parts || [])
-    .filter((part) => part?.type === "text" && typeof part.text === "string")
-    .map((part) => part.text)
-    .join(" ")
-    .trim();
-}
-
-function pipeStaticMessage(response, message) {
+function pipeStaticMessage(response, messages, message, stage) {
   const stream = createUIMessageStream({
+    originalMessages: messages,
     execute({ writer }) {
       const id = globalThis.crypto?.randomUUID?.() || `lia-${Date.now()}`;
+      writer.write({ type: "start", messageMetadata: { liaStage: stage } });
       writer.write({ type: "text-start", id });
       writer.write({ type: "text-delta", id, delta: message });
       writer.write({ type: "text-end", id });
+      writer.write({ type: "finish", messageMetadata: { liaStage: stage } });
     },
   });
 
   return pipeUIMessageStreamToResponse({ response, stream });
+}
+
+function modelMessages(messages) {
+  return messages.filter((message) => message.role !== "system");
+}
+
+async function generateDraft(provider, config, messages, plan, strict = false) {
+  const system = plan.mode === LIA_STAGES.PROBABLE
+    ? `${LIA_PROBABLE_SYSTEM_PROMPT}\n\n${PROBABLE_FALLBACK_NOTICE}`
+    : `${LIA_SYSTEM_PROMPT}\n\nمنابع Documentation داخلی بازیابی‌شده:\n${formatDocumentationContext(plan.hits)}\n\n${strict ? "پیش از خروجی نهایی، پشتیبانی هر ادعا از منابع را دوباره بررسی کن." : ""}`;
+  const result = streamText({
+    model: provider.chatModel(config.model),
+    system,
+    messages: await convertToModelMessages(modelMessages(messages)),
+  });
+  return result.text;
 }
 
 export default async function handler(req, res) {
@@ -85,33 +76,34 @@ export default async function handler(req, res) {
   }
 
   try {
-    const documentation = await searchDocumentation(latestUserText(messages));
-    if (!documentation.available) {
-      return await pipeStaticMessage(res, DOCUMENTATION_UNAVAILABLE_MESSAGE);
-    }
-    if (!documentation.hits.length) {
-      return await pipeStaticMessage(res, NO_DOCUMENTATION_MESSAGE);
-    }
-
     const provider = createOpenAICompatible({
       name: "liara-router",
       apiKey: config.apiKey,
       baseURL: config.baseUrl,
       includeUsage: true,
     });
-    const result = streamText({
-      model: provider.chatModel(config.model),
-      system: `${LIA_SYSTEM_PROMPT}\n\nمنابع Documentation داخلی بازیابی‌شده:\n${formatDocumentationContext(documentation.hits)}\n\nمنبع پاسخ را خودت تولید نکن؛ سرور پس از متن پاسخ آن را دقیقاً اضافه می‌کند.`,
-      messages: await convertToModelMessages(messages.filter((message) => message.role !== "system")),
-    });
+    const plan = await createLiaControllerPlan(messages);
+    if (plan.mode === "unavailable") return await pipeStaticMessage(res, messages, DOCUMENTATION_UNAVAILABLE_MESSAGE, plan.stage);
+    if (plan.mode === LIA_STAGES.CLARIFICATION) return await pipeStaticMessage(res, messages, CLARIFICATION_MESSAGE, plan.stage);
+
+    let answer = await generateDraft(provider, config, messages, plan);
+    if (!validateLiaDraft(answer)) answer = await generateDraft(provider, config, messages, plan, true);
+    if (!validateLiaDraft(answer)) {
+      return await pipeStaticMessage(res, messages, DOCUMENTATION_UNAVAILABLE_MESSAGE, LIA_STAGES.CLARIFICATION);
+    }
+    const finalText = plan.mode === LIA_STAGES.ANSWER
+      ? `${answer.trim()}${formatDocumentationSources(plan.hits)}`
+      : answer.trim();
 
     const stream = createUIMessageStream({
+      originalMessages: messages,
       async execute({ writer }) {
         const id = globalThis.crypto?.randomUUID?.() || `lia-${Date.now()}`;
+        writer.write({ type: "start", messageMetadata: { liaStage: plan.stage } });
         writer.write({ type: "text-start", id });
-        for await (const chunk of result.textStream) writer.write({ type: "text-delta", id, delta: chunk });
-        writer.write({ type: "text-delta", id, delta: formatDocumentationSources(documentation.hits) });
+        writer.write({ type: "text-delta", id, delta: finalText });
         writer.write({ type: "text-end", id });
+        writer.write({ type: "finish", messageMetadata: { liaStage: plan.stage } });
       },
     });
     await pipeUIMessageStreamToResponse({

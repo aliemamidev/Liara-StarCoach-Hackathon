@@ -9,17 +9,11 @@ import { GoSearch, GoRows } from "react-icons/go";
 import { GoSun, GoMoon } from "react-icons/go";
 import Button from "../Common/button";
 import PlatformIcon from "../Common/icons";
-import MeiliSearch from "meilisearch";
 import debounce from "lodash.debounce";
 import { useRouter } from "next/router";
 import UAParser from "ua-parser-js";
 import Link from "next/link";
 import { useTheme } from "next-themes";
-
-const client = new MeiliSearch({
-  host: "https://search.liara.ir",
-  apiKey: "53c93d9ce3308e48a7ad701d4b402d3190324a09e1607f14baae9bd4f805bb11",
-});
 
 const Header = ({ setShowSidebar }) => {
   const [results, setResults] = useState([]);
@@ -64,13 +58,12 @@ const Header = ({ setShowSidebar }) => {
       osVersion: userAgent.getOS().version,
     };
 
-    return client
-      .index("docs")
-      .search(value, { limit: 10 })
+    return fetch(`/api/docs-search?q=${encodeURIComponent(value)}`)
+      .then((response) => (response.ok ? response.json() : { hits: [] }))
       .then((res) => {
-        setResults(res.hits);
-        setNotFound(value != "" && res.hits.length == 0);
-        if (res.hits.length == 0) {
+        setResults(res.hits || []);
+        setNotFound(value != "" && (res.hits || []).length == 0);
+        if ((res.hits || []).length == 0) {
           setCurrent(undefined);
         }
       });
@@ -283,5 +276,4 @@ const Header = ({ setShowSidebar }) => {
 };
 
 export default Header;
-
 

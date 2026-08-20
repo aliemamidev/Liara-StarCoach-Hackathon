@@ -15,6 +15,7 @@ function serializeMessages(messages) {
   return messages.map((message) => ({
     id: message.id,
     role: message.role,
+    ...(message.metadata?.liaStage ? { metadata: { liaStage: message.metadata.liaStage } } : {}),
     parts: (message.parts || [])
       .filter((part) => part?.type === "text")
       .map((part) => ({ type: "text", text: part.text || "" })),
