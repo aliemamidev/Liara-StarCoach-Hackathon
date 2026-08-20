@@ -784,6 +784,15 @@ pre code {
   margin-top: 10px;
 }
 
+.chat-speech-button {
+  color: hsl(var(--chat-muted));
+}
+
+.chat-speech-button.is-reading {
+  color: hsl(var(--chat-accent));
+  background: hsl(var(--chat-accent) / 0.12);
+}
+
 .chat-composer textarea {
   min-height: 42px;
   max-height: 168px;
@@ -964,4 +973,3 @@ pre code {
 .dark body { background: hsl(var(--chat-bg)) !important; }
 @media (max-width: 640px) { .chat-screenshot-toolbar { top: 10px; max-width: calc(100% - 20px); } .chat-screenshot-toolbar span { overflow: hidden; text-overflow: ellipsis; } }
 @media (max-width: 640px) { .chat-header { padding: 14px 16px; } .chat-main { padding-inline: 12px; } .chat-message-user { max-width: 92%; } .chat-composer-wrap { padding-inline: 12px; } .chat-composer-hint { display: none; } .chat-docs-link { bottom: max(72px, calc(env(safe-area-inset-bottom) + 56px)); left: 12px; } .chat-docs-link span { display: none; } }
-
