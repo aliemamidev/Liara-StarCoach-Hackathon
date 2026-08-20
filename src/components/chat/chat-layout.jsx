@@ -28,7 +28,7 @@ export function ChatLayout() {
   const [screenshotError, setScreenshotError] = useState("");
   const sound = useUiSound();
   const chatHistory = useChatHistory();
-  const { hydrated, activeChatId, history, renameChat, markTitleGenerationAttempted } = chatHistory;
+  const { hydrated, activeChatId, history, renameChat } = chatHistory;
   const activeChat = history.find((chat) => chat.id === activeChatId);
   const loadedChatRef = useRef(null);
   const messagesViewportRef = useRef(null);
@@ -60,18 +60,14 @@ export function ChatLayout() {
   useEffect(() => {
     if (!hydrated || status !== "ready" || !activeChatId || !messages.length) return;
     const chat = history.find((item) => item.id === activeChatId);
-    const userMessages = messages.filter((message) => message.role === "user");
     const hasAssistantResponse = messages.some((message) => message.role === "assistant");
     if (
       !chat ||
       chat.titleGenerated ||
-      chat.titleGenerationAttempted ||
       titleRequestsRef.current.has(chat.id) ||
-      userMessages.length !== 1 ||
       !hasAssistantResponse
     ) return;
     titleRequestsRef.current.add(chat.id);
-    markTitleGenerationAttempted(chat.id);
     fetch("/api/chat-title", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
@@ -80,7 +76,7 @@ export function ChatLayout() {
       .then((response) => (response.ok ? response.json() : null))
       .then((result) => result?.title && renameChat(chat.id, result.title, { generated: true }))
       .catch(() => {});
-  }, [activeChatId, hydrated, history, markTitleGenerationAttempted, messages, renameChat, status]);
+  }, [activeChatId, hydrated, history, messages, renameChat, status]);
 
   function submitMessage(value = input) {
     const trimmed = value.trim();
