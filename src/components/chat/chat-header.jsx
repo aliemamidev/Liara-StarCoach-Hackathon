@@ -9,7 +9,7 @@ import {
 } from "@/components/ui/tooltip";
 
 
-export function ChatHeader({ onOpenSettings, onOpenHistory }) {
+export function ChatHeader({ title, onOpenSettings, onOpenHistory }) {
   return (
     <header className="chat-header">
       <div className="flex items-center gap-3">
@@ -20,7 +20,7 @@ export function ChatHeader({ onOpenSettings, onOpenHistory }) {
         />
         <div>
           <p className="text-sm font-bold text-[hsl(var(--chat-text))]">دستیار هوشمند لیارا</p>
-          <p className="text-xs text-[hsl(var(--chat-muted))]">همراه شما برای پاسخ‌های فنی</p>
+          <p className="chat-current-title" title={title}>{title}</p>
         </div>
       </div>
 
@@ -47,7 +47,6 @@ export function ChatHeader({ onOpenSettings, onOpenHistory }) {
     </header>
   );
 }
-
 
 
 

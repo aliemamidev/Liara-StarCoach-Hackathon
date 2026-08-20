@@ -13,6 +13,7 @@ import { ChatSettings } from "@/components/chat/chat-settings";
 
 import { ChatHistory } from "@/components/chat/chat-history";
 import { ScreenshotOverlay } from "@/components/chat/screenshot-overlay";
+import { ScreenshotSourceDialog } from "@/components/chat/screenshot-source-dialog";
 import { useUiSound } from "@/hooks/use-ui-sound";
 import { useChatHistory } from "@/hooks/use-chat-history";
 
@@ -23,10 +24,12 @@ export function ChatLayout() {
 
   const [historyOpen, setHistoryOpen] = useState(false);
   const [screenshotOpen, setScreenshotOpen] = useState(false);
+  const [screenshotSourceOpen, setScreenshotSourceOpen] = useState(false);
   const [screenshotError, setScreenshotError] = useState("");
   const sound = useUiSound();
   const chatHistory = useChatHistory();
   const { hydrated, activeChatId, history, renameChat } = chatHistory;
+  const activeChat = history.find((chat) => chat.id === activeChatId);
   const loadedChatRef = useRef(null);
   const titleRequestsRef = useRef(new Set());
   const liveResponseRef = useRef(false);
@@ -64,7 +67,7 @@ export function ChatLayout() {
       body: JSON.stringify({ messages }),
     })
       .then((response) => (response.ok ? response.json() : null))
-      .then((result) => result?.title && renameChat(chat.id, result.title))
+      .then((result) => result?.title && renameChat(chat.id, result.title, { generated: true }))
       .catch(() => titleRequestsRef.current.delete(chat.id));
   }, [activeChatId, hydrated, history, messages, renameChat, status]);
 
@@ -110,6 +113,47 @@ export function ChatLayout() {
     setScreenshotError("");
   }
 
+  async function captureDisplayScreenshot(source) {
+    setScreenshotSourceOpen(false);
+    if (!navigator.mediaDevices?.getDisplayMedia) {
+      setScreenshotOpen(true);
+      return;
+    }
+
+    let stream;
+    try {
+      const displaySurface = source === "window" ? "window" : source === "browser" ? "browser" : "monitor";
+      stream = await navigator.mediaDevices.getDisplayMedia({
+        audio: false,
+        video: { displaySurface },
+        ...(source === "browser" ? { preferCurrentTab: true, selfBrowserSurface: "include" } : {}),
+      });
+      const track = stream.getVideoTracks()[0];
+      if (!track) throw new Error("screenshot-track-missing");
+      const settings = track.getSettings();
+      const video = document.createElement("video");
+      video.srcObject = stream;
+      video.muted = true;
+      await video.play();
+      await new Promise((resolve) => requestAnimationFrame(resolve));
+      const canvas = document.createElement("canvas");
+      canvas.width = settings.width || video.videoWidth;
+      canvas.height = settings.height || video.videoHeight;
+      if (!canvas.width || !canvas.height) throw new Error("screenshot-size-missing");
+      canvas.getContext("2d").drawImage(video, 0, 0, canvas.width, canvas.height);
+      const blob = await new Promise((resolve) => canvas.toBlob(resolve, "image/png"));
+      if (!blob) throw new Error("screenshot-empty");
+      const timestamp = new Date().toISOString().replace(/[:.]/g, "-").slice(0, 19);
+      captureScreenshot(new File([blob], `screenshot-${timestamp}.png`, { type: "image/png" }));
+    } catch (error) {
+      if (error?.name !== "NotAllowedError" && error?.name !== "AbortError") {
+        setScreenshotError("گرفتن تصویر از منبع انتخاب‌شده ممکن نشد. دوباره تلاش کنید.");
+      }
+    } finally {
+      stream?.getTracks().forEach((track) => track.stop());
+    }
+  }
+
   function cancelScreenshot(message = "") {
     setScreenshotOpen(false);
     setScreenshotError(message);
@@ -118,6 +162,7 @@ export function ChatLayout() {
   return (
     <main className="chat-shell" dir="rtl">
       <ChatHeader
+        title={activeChat?.title || "گفتگوی جدید"}
         onOpenSettings={() => {
           setSettingsOpen(true);
           sound.playSound("toggle");
@@ -145,7 +190,7 @@ export function ChatLayout() {
         files={files}
         onFilesChange={setFiles}
 
-        onScreenshot={() => { setScreenshotError(""); setScreenshotOpen(true); }}
+        onScreenshot={() => { setScreenshotError(""); setScreenshotSourceOpen(true); }}
         screenshotError={screenshotError}
         onSubmit={() => submitMessage()}
         status={status}
@@ -170,7 +215,13 @@ export function ChatLayout() {
         activeChatId={chatHistory.activeChatId}
         onSelect={selectChat}
         onNewChat={startNewChat}
+        onRename={chatHistory.renameChat}
         onDelete={(id) => { if (window.confirm("این گفتگو حذف شود؟")) chatHistory.deleteChat(id); }}
+      />
+      <ScreenshotSourceDialog
+        open={screenshotSourceOpen}
+        onOpenChange={setScreenshotSourceOpen}
+        onContinue={captureDisplayScreenshot}
       />
       {screenshotOpen && <ScreenshotOverlay onCapture={captureScreenshot} onCancel={cancelScreenshot} />}
     </main>

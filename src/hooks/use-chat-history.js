@@ -30,7 +30,13 @@ function serializeMessages(messages) {
 function parseHistory(raw) {
   const parsed = JSON.parse(raw);
   if (!Array.isArray(parsed)) throw new Error("invalid history");
-  return parsed.filter((chat) => chat?.id && Array.isArray(chat.messages));
+  return parsed
+    .filter((chat) => chat?.id && Array.isArray(chat.messages))
+    .map((chat) => ({
+      ...chat,
+      title: chat.title || textFromMessage(chat.messages.find((message) => message.role === "user")) || "گفتگوی جدید",
+      titleGenerated: Boolean(chat.titleGenerated),
+    }));
 }
 
 export function useChatHistory() {
@@ -92,13 +98,22 @@ export function useChatHistory() {
     return id;
   }, [activeChatId, history, persist, setActiveChatId]);
 
-  const renameChat = useCallback((id, title) => {
+  const renameChat = useCallback((id, title, { generated = false } = {}) => {
     const cleanTitle = title?.trim().slice(0, 60);
     if (!cleanTitle) return;
-    persist(history.map((chat) => (
-      chat.id === id ? { ...chat, title: cleanTitle, titleGenerated: true, updatedAt: Date.now() } : chat
-    )));
-  }, [history, persist]);
+    setHistory((currentHistory) => {
+      if (generated && currentHistory.find((chat) => chat.id === id)?.titleGenerated) return currentHistory;
+      const nextHistory = currentHistory.map((chat) => (
+        chat.id === id ? { ...chat, title: cleanTitle, titleGenerated: true, updatedAt: Date.now() } : chat
+      ));
+      try {
+        window.localStorage.setItem(STORAGE_KEY, JSON.stringify(nextHistory));
+      } catch {
+        // Ignore storage failures; the in-memory title remains usable.
+      }
+      return nextHistory;
+    });
+  }, []);
 
   const deleteChat = useCallback((id) => {
     persist(history.filter((chat) => chat.id !== id));
@@ -107,4 +122,3 @@ export function useChatHistory() {
 
   return { history, activeChatId, hydrated, setActiveChatId, saveMessages, renameChat, deleteChat };
 }
-

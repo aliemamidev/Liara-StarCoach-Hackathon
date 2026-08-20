@@ -1,4 +1,4 @@
-import { AlertCircle, Check, Clipboard, RotateCcw, Square, Volume2 } from "lucide-react";
+import { AlertCircle, Check, Clipboard, LoaderCircle, RotateCcw, Square, Volume2 } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
 import { Button } from "@/components/ui/button";
 import {
@@ -8,28 +8,47 @@ import {
   TooltipTrigger,
 } from "@/components/ui/tooltip";
 
+function splitSpeech(text) {
+  const sentences = text.match(/[^.!?؟؛\n]+[.!?؟؛\n]*/g) || [text];
+  const chunks = [];
+  sentences.forEach((sentence) => {
+    for (let index = 0; index < sentence.length; index += 3500) {
+      chunks.push(sentence.slice(index, index + 3500).trim());
+    }
+  });
+  return chunks.filter(Boolean);
+}
+
 export function ChatActions({ content, onRetry, playSound }) {
   const [copied, setCopied] = useState(false);
   const [speechStatus, setSpeechStatus] = useState("ready");
   const speechStatusRef = useRef("ready");
   const speechIdRef = useRef(`speech-${Math.random().toString(36).slice(2)}`);
   const speechRequestRef = useRef(0);
+  const abortControllerRef = useRef(null);
+  const audioRef = useRef(null);
+  const objectUrlsRef = useRef(new Set());
 
   useEffect(() => {
+    const objectUrls = objectUrlsRef.current;
     function stopWhenAnotherMessageStarts(event) {
-      if (event.detail !== speechIdRef.current) {
-        speechRequestRef.current += 1;
-        window.speechSynthesis?.cancel();
-        speechStatusRef.current = "stopped";
-        setSpeechStatus("stopped");
-      }
+      if (event.detail === speechIdRef.current) return;
+      speechRequestRef.current += 1;
+      abortControllerRef.current?.abort();
+      audioRef.current?.pause();
+      audioRef.current = null;
+      setSpeechStatus("stopped");
+      speechStatusRef.current = "stopped";
     }
 
     window.addEventListener("chat:speech-start", stopWhenAnotherMessageStarts);
     return () => {
       window.removeEventListener("chat:speech-start", stopWhenAnotherMessageStarts);
       speechRequestRef.current += 1;
-      window.speechSynthesis?.cancel();
+      abortControllerRef.current?.abort();
+      audioRef.current?.pause();
+      objectUrls.forEach((url) => URL.revokeObjectURL(url));
+      objectUrls.clear();
     };
   }, []);
 
@@ -38,78 +57,69 @@ export function ChatActions({ content, onRetry, playSound }) {
     setSpeechStatus(status);
   }
 
-  function waitForVoices() {
-    const currentVoices = window.speechSynthesis.getVoices();
-    if (currentVoices.length) return Promise.resolve(currentVoices);
-    return new Promise((resolve) => {
-      const finish = () => {
-        window.clearTimeout(timeout);
-        window.speechSynthesis.removeEventListener("voiceschanged", finish);
-        resolve(window.speechSynthesis.getVoices());
-      };
-      const timeout = window.setTimeout(finish, 700);
-      window.speechSynthesis.addEventListener("voiceschanged", finish, { once: true });
-    });
+  function stopSpeech() {
+    speechRequestRef.current += 1;
+    abortControllerRef.current?.abort();
+    abortControllerRef.current = null;
+    audioRef.current?.pause();
+    audioRef.current = null;
+    objectUrlsRef.current.forEach((url) => URL.revokeObjectURL(url));
+    objectUrlsRef.current.clear();
+    updateSpeechStatus("stopped");
   }
 
-  function splitSpeech(text) {
-    const sentences = text.match(/[^.!?؟؛\n]+[.!?؟؛\n]*/g) || [text];
-    const chunks = [];
-    sentences.forEach((sentence) => {
-      for (let index = 0; index < sentence.length; index += 220) chunks.push(sentence.slice(index, index + 220));
+  function waitForAudio(audio, requestId) {
+    return new Promise((resolve, reject) => {
+      audio.onended = resolve;
+      audio.onerror = () => reject(new Error("audio-playback-failed"));
+      if (speechRequestRef.current !== requestId) {
+        reject(new DOMException("Speech request was cancelled", "AbortError"));
+        return;
+      }
+      audio.play().catch(reject);
     });
-    return chunks.filter(Boolean);
   }
 
   async function speakMessage() {
-    if (typeof window === "undefined" || !("speechSynthesis" in window) || !("SpeechSynthesisUtterance" in window)) {
-      updateSpeechStatus("error");
-      return;
-    }
-
-    const requestId = speechRequestRef.current + 1;
-    speechRequestRef.current = requestId;
-    window.speechSynthesis.cancel();
+    stopSpeech();
+    const requestId = speechRequestRef.current;
+    const controller = new AbortController();
+    abortControllerRef.current = controller;
     window.dispatchEvent(new CustomEvent("chat:speech-start", { detail: speechIdRef.current }));
-    const voices = await waitForVoices();
-    if (speechRequestRef.current !== requestId) return;
-    const voice = voices.find((item) => item.lang.toLowerCase() === "fa-ir")
-      || voices.find((item) => item.lang.toLowerCase().startsWith("fa"));
-    if (!voice) {
-      updateSpeechStatus("error");
-      return;
-    }
-    const chunks = splitSpeech(content);
-    let index = 0;
-    const speakNext = () => {
-      if (speechRequestRef.current !== requestId) return;
-      if (index >= chunks.length) {
-        updateSpeechStatus("stopped");
-        return;
+    updateSpeechStatus("preparing");
+
+    try {
+      for (const chunk of splitSpeech(content)) {
+        if (speechRequestRef.current !== requestId) return;
+        const response = await fetch("/api/chat-speech", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ text: chunk }),
+          signal: controller.signal,
+        });
+        if (!response.ok) throw new Error("speech-api-failed");
+        const url = URL.createObjectURL(await response.blob());
+        objectUrlsRef.current.add(url);
+        const audio = new Audio(url);
+        audio.preload = "auto";
+        audioRef.current = audio;
+        updateSpeechStatus("reading");
+        await waitForAudio(audio, requestId);
+        URL.revokeObjectURL(url);
+        objectUrlsRef.current.delete(url);
+        audioRef.current = null;
       }
-      const utterance = new window.SpeechSynthesisUtterance(chunks[index]);
-      utterance.lang = voice.lang;
-      utterance.voice = voice;
-      utterance.rate = 0.95;
-      utterance.onend = () => { index += 1; speakNext(); };
-      utterance.onerror = () => {
-        if (speechRequestRef.current === requestId) updateSpeechStatus("error");
-      };
-      window.speechSynthesis.speak(utterance);
-    };
-    updateSpeechStatus("reading");
-    speakNext();
+      if (speechRequestRef.current === requestId) updateSpeechStatus("stopped");
+    } catch (error) {
+      if (error?.name !== "AbortError" && speechRequestRef.current === requestId) updateSpeechStatus("error");
+    } finally {
+      if (speechRequestRef.current === requestId) abortControllerRef.current = null;
+    }
   }
 
   function handleSpeechClick() {
-    if (speechStatus === "reading") {
-      speechRequestRef.current += 1;
-      window.speechSynthesis?.cancel();
-      updateSpeechStatus("stopped");
-      return;
-    }
-
-    speakMessage();
+    if (speechStatus === "reading" || speechStatus === "preparing") stopSpeech();
+    else speakMessage();
   }
 
   async function handleCopy() {
@@ -123,67 +133,43 @@ export function ChatActions({ content, onRetry, playSound }) {
     }
   }
 
+  const speechLabel = speechStatus === "preparing"
+    ? "در حال آماده‌سازی صدا..."
+    : speechStatus === "reading"
+      ? "در حال خواندن پاسخ..."
+      : speechStatus === "error"
+        ? "تبدیل متن به صدا ممکن نشد"
+        : "صدای تولیدشده با هوش مصنوعی";
+
   return (
     <TooltipProvider delayDuration={250}>
-      <div className="mt-3 flex items-center gap-1">
+      <div className="mt-3 flex flex-wrap items-center gap-1">
         <Tooltip>
           <TooltipTrigger asChild>
-            <Button
-              variant="ghost"
-              size="icon"
-              className="h-8 w-8"
-              aria-label={copied ? "کپی شد" : "کپی پاسخ"}
-              onClick={handleCopy}
-            >
+            <Button variant="ghost" size="icon" className="h-8 w-8" aria-label={copied ? "کپی شد" : "کپی پاسخ"} onClick={handleCopy}>
               {copied ? <Check size={15} /> : <Clipboard size={15} />}
             </Button>
           </TooltipTrigger>
           <TooltipContent>{copied ? "کپی شد" : "کپی"}</TooltipContent>
         </Tooltip>
-        {speechStatus === "error" && (
-          <span className="chat-speech-error" role="status">
-            صدای فارسی روی این دستگاه نصب یا فعال نیست
-          </span>
-        )}
         <Tooltip>
           <TooltipTrigger asChild>
             <Button
               variant="ghost"
               size="icon"
               className={`h-8 w-8 chat-speech-button${speechStatus === "reading" ? " is-reading" : ""}`}
-              aria-label={
-                speechStatus === "reading"
-                  ? "توقف خواندن"
-              : speechStatus === "error"
-                    ? "صدای فارسی در مرورگر پیدا نشد"
-                    : speechStatus === "stopped"
-                      ? "شروع دوباره خواندن"
-                      : "خواندن پاسخ با صدا"
-              }
+              aria-label={speechStatus === "reading" || speechStatus === "preparing" ? "توقف خواندن" : "خواندن پاسخ با صدا"}
               onClick={handleSpeechClick}
             >
-              {speechStatus === "reading" ? <Square size={14} /> : speechStatus === "error" ? <AlertCircle size={15} /> : <Volume2 size={15} />}
+              {speechStatus === "preparing" ? <LoaderCircle className="animate-spin" size={15} /> : speechStatus === "reading" ? <Square size={14} /> : speechStatus === "error" ? <AlertCircle size={15} /> : <Volume2 size={15} />}
             </Button>
           </TooltipTrigger>
-          <TooltipContent>
-            {speechStatus === "reading"
-              ? "توقف خواندن"
-                : speechStatus === "error"
-                ? "صدای فارسی روی این دستگاه نصب یا فعال نیست"
-                : speechStatus === "stopped"
-                  ? "شروع دوباره خواندن"
-                  : "خواندن با صدا"}
-          </TooltipContent>
+          <TooltipContent>{speechLabel}</TooltipContent>
         </Tooltip>
+        <span className={`chat-speech-status${speechStatus === "error" ? " is-error" : ""}`} role="status">{speechLabel}</span>
         <Tooltip>
           <TooltipTrigger asChild>
-            <Button
-              variant="ghost"
-              size="icon"
-              className="h-8 w-8"
-              aria-label="تلاش دوباره"
-              onClick={onRetry}
-            >
+            <Button variant="ghost" size="icon" className="h-8 w-8" aria-label="تلاش دوباره" onClick={onRetry}>
               <RotateCcw size={15} />
             </Button>
           </TooltipTrigger>
@@ -193,6 +179,3 @@ export function ChatActions({ content, onRetry, playSound }) {
     </TooltipProvider>
   );
 }
-
-
-
