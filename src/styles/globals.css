@@ -32,10 +32,8 @@ body {
   direction: rtl;
   font-family: Yekan Bakh;
   color: rgb(var(--foreground-rgb));
-  background: linear-gradient(to bottom,
-      transparent,
-      rgb(var(--background-end-rgb))) rgb(var(--background-start-rgb));
-  color: #181818;
+  background: hsl(var(--site-bg));
+  color: hsl(var(--site-text));
   font-size: 15px;
 
 }

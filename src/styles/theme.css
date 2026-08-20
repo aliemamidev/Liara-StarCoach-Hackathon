@@ -1,0 +1,129 @@
+:root {
+  --site-bg: 220 24% 97%;
+  --site-surface: 0 0% 100%;
+  --site-input: 220 25% 99%;
+  --site-text: 222 35% 15%;
+  --site-muted: 218 15% 46%;
+  --site-border: 218 22% 88%;
+  --site-accent: 171 69% 64%;
+  --site-accent-strong: 174 77% 42%;
+  --site-accent-foreground: 207 42% 13%;
+  --site-brand: 215 46% 28%;
+  --site-brand-surface: 215 46% 17%;
+  --site-danger: 356 64% 53%;
+  --site-danger-foreground: 356 64% 40%;
+}
+
+.dark {
+  --site-bg: 222 31% 9%;
+  --site-surface: 222 27% 13%;
+  --site-input: 222 24% 16%;
+  --site-text: 210 33% 95%;
+  --site-muted: 216 15% 67%;
+  --site-border: 220 22% 25%;
+  --site-accent: 171 74% 63%;
+  --site-accent-strong: 174 72% 52%;
+  --site-accent-foreground: 214 40% 11%;
+  --site-brand: 215 44% 42%;
+  --site-brand-surface: 215 46% 12%;
+  --site-danger: 356 72% 65%;
+  --site-danger-foreground: 356 74% 75%;
+}
+
+html,
+body {
+  background: hsl(var(--site-bg));
+  color: hsl(var(--site-text));
+}
+
+body {
+  font-family: Vazirmatn, "Yekan Bakh", sans-serif;
+}
+
+.login-visual-grid {
+  background-image: linear-gradient(hsl(var(--site-accent) / .08) 1px, transparent 1px), linear-gradient(90deg, hsl(var(--site-accent) / .08) 1px, transparent 1px), radial-gradient(circle at 70% 35%, hsl(var(--site-accent) / .28), transparent 35%);
+  background-size: 32px 32px, 32px 32px, auto;
+  mask-image: linear-gradient(to bottom, black, transparent 85%);
+}
+
+.dark .admin-shell [class*="bg-[#f5f7fb]"],
+.dark .admin-shell [class*="bg-[#fbfcfe]"],
+.dark .admin-shell [class*="bg-white"],
+.dark .admin-shell [class*="bg-[#f8fafc]"],
+.dark .admin-shell [class*="bg-[#f1f4f8]"],
+.dark .admin-shell [class*="bg-[#f3f7fd]"],
+.dark .admin-shell [class*="bg-[#f4f7fb]"] {
+  background-color: hsl(var(--site-surface)) !important;
+}
+
+.dark .admin-shell [class*="text-[#1a2940]"],
+.dark .admin-shell [class*="text-[#1b2b43]"],
+.dark .admin-shell [class*="text-[#293850]"],
+.dark .admin-shell [class*="text-[#2a3a51]"],
+.dark .admin-shell [class*="text-[#33435a]"],
+.dark .admin-shell [class*="text-[#34445c]"],
+.dark .admin-shell [class*="text-[#536278]"],
+.dark .admin-shell [class*="text-[#66758a]"] {
+  color: hsl(var(--site-text)) !important;
+}
+
+.dark .admin-shell [class*="border-[#e"],
+.dark .admin-shell [class*="border-[#d"],
+.dark .admin-shell [class*="divide-[#e"] {
+  border-color: hsl(var(--site-border)) !important;
+}
+
+.dark .admin-shell input,
+.dark .admin-shell textarea {
+  background-color: hsl(var(--site-input));
+  border-color: hsl(var(--site-border));
+  color: hsl(var(--site-text));
+}
+
+.dark .admin-shell header {
+  background-color: hsl(var(--site-bg) / .9) !important;
+  border-color: hsl(var(--site-border)) !important;
+}
+
+/* Shared documentation chrome uses legacy utility colors; keep it on the same theme tokens. */
+header[class*="bg-[#fbfbfb]"],
+sidebar[class*="bg-[#fbfbfb]"] {
+  background-color: hsl(var(--site-surface)) !important;
+  color: hsl(var(--site-text));
+  border-color: hsl(var(--site-border)) !important;
+}
+
+header[class*="bg-[#fbfbfb]"] #search {
+  color: hsl(var(--site-muted));
+  border-color: hsl(var(--site-border));
+  background-color: hsl(var(--site-input) / .7);
+}
+
+.dark header[class*="bg-[#fbfbfb]"] #search:hover {
+  background-color: hsl(var(--site-muted) / .12) !important;
+}
+
+header[class*="bg-[#fbfbfb]"] .badge-cmd-k {
+  color: hsl(var(--site-muted));
+  background-color: hsl(var(--site-muted) / .12);
+  border-color: hsl(var(--site-border));
+}
+
+sidebar[class*="bg-[#fbfbfb]"] .badge {
+  border-color: hsl(var(--site-border));
+  background-color: hsl(var(--site-muted) / .1);
+}
+
+.dark .chat-history,
+.dark .chat-history-title,
+.dark .chat-history-open {
+  color: hsl(var(--site-text));
+  border-color: hsl(var(--site-border));
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .login-visual-grid,
+  .admin-auth-orb {
+    animation: none !important;
+  }
+}

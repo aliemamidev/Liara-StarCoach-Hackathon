@@ -136,6 +136,8 @@ const Header = ({ setShowSidebar }) => {
         <button
           onClick={() => setSearchOpen(true)}
           id="search"
+          data-cuelume-press="press"
+          data-cuelume-release="release"
           className="hidden md:block ml-12 md:ml-0 md:w-[350px] px-2 py-1 relative text-[#707070] hover:bg-[#00000008]  border border-[#0002] rounded-md"
         >
           <div className="hidden md:flex items-center gap-2">
@@ -149,6 +151,8 @@ const Header = ({ setShowSidebar }) => {
 
         <div
           onClick={() => setSearchOpen(true)}
+          data-cuelume-press="press"
+          data-cuelume-release="release"
           className="flex md:hidden bg-blue-600 text-white p-2 text-[20px] fixed bottom-4 left-4 rounded-full items-center gap-2"
         >
           <GoSearch />
@@ -163,6 +167,7 @@ const Header = ({ setShowSidebar }) => {
 
         <button
           onClick={toggleDarkMode}
+          data-cuelume-toggle="toggle"
           className="text-[18px]  absolute md:hidden left-14 hover:bg-[#0001] transition-all p-1 rounded-full"
         >
           {resolvedTheme === "dark" ? <GoMoon /> : <GoSun />}
@@ -177,6 +182,7 @@ const Header = ({ setShowSidebar }) => {
           </a>
           <button
             onClick={toggleDarkMode}
+            data-cuelume-toggle="toggle"
             className="text-[18px]  hover:bg-[#0001] transition-all p-1 rounded-full"
           >
             {resolvedTheme === "dark" ? <GoMoon /> : <GoSun />}
@@ -276,4 +282,3 @@ const Header = ({ setShowSidebar }) => {
 };
 
 export default Header;
-
