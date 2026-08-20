@@ -8,6 +8,16 @@ function validMessages(messages) {
   );
 }
 
+function cleanTitle(value) {
+  return value
+    .replace(/^(عنوان|title)\s*[:：-]\s*/i, "")
+    .replace(/["'«»]/g, "")
+    .replace(/\s+/g, " ")
+    .replace(/[.!؟]+$/g, "")
+    .trim()
+    .slice(0, 60);
+}
+
 export default async function handler(req, res) {
   if (req.method !== "POST") {
     res.setHeader("Allow", "POST");
@@ -15,7 +25,7 @@ export default async function handler(req, res) {
   }
 
   const config = getAiConfig();
-  if (!isAiConfigured(config) || !validMessages(req.body?.messages)) {
+  if (!isAiConfigured(config) || !validMessages(req.body?.messages) || !req.body.messages.some((message) => message.role === "user")) {
     return res.status(400).json({ error: "درخواست نامعتبر است." });
   }
 
@@ -25,13 +35,14 @@ export default async function handler(req, res) {
       apiKey: config.apiKey,
       baseURL: config.baseUrl,
     });
+    const firstUserMessage = req.body.messages.find((message) => message.role === "user");
     const { text } = await generateText({
       model: provider.chatModel(config.model),
-      system: "برای این گفت‌وگوی فارسی یک عنوان کوتاه و دقیق بنویس. فقط خود عنوان را، بدون نقل‌قول، شماره‌گذاری یا توضیح، در حداکثر ۶۰ کاراکتر برگردان.",
-      messages: await convertToModelMessages(req.body.messages),
+      system: "بر اساس پیام کاربر یک عنوان کوتاه و دقیق برای موضوع اصلی گفتگو بنویس. فقط خود عنوان را، بدون نقل‌قول، شماره‌گذاری، توضیح یا جمله کامل، در حداکثر ۶۰ کاراکتر و ترجیحاً حداکثر ۶ کلمه برگردان.",
+      messages: await convertToModelMessages([firstUserMessage]),
       maxOutputTokens: 20,
     });
-    const title = text.replace(/[\"'«»]/g, "").replace(/\s+/g, " ").trim().slice(0, 60);
+    const title = cleanTitle(text);
     return res.status(200).json({ title: title || "گفتگوی جدید" });
   } catch {
     return res.status(502).json({ error: "ساخت عنوان گفتگو ممکن نشد." });

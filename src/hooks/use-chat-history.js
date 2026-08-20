@@ -37,6 +37,7 @@ function parseHistory(raw) {
       ...chat,
       title: chat.title || textFromMessage(chat.messages.find((message) => message.role === "user")) || "گفتگوی جدید",
       titleGenerated: Boolean(chat.titleGenerated),
+      titleGenerationAttempted: Boolean(chat.titleGenerationAttempted || chat.titleGenerated),
     }));
 }
 
@@ -81,14 +82,13 @@ export function useChatHistory() {
   const saveMessages = useCallback((messages) => {
     if (!messages.length) return activeChatId;
     const now = Date.now();
-    const firstUserMessage = messages.find((message) => message.role === "user");
-    const title = (textFromMessage(firstUserMessage) || "گفتگوی جدید").slice(0, 60);
     const id = activeChatId || `${now}-${Math.random().toString(36).slice(2, 8)}`;
     const existing = history.find((chat) => chat.id === id);
     const nextChat = {
       id,
-      title: existing?.title || title,
+      title: existing?.title || "گفتگوی جدید",
       titleGenerated: existing?.titleGenerated || false,
+      titleGenerationAttempted: existing?.titleGenerationAttempted || false,
       createdAt: existing?.createdAt || now,
       updatedAt: now,
       messages: serializeMessages(messages),
@@ -105,7 +105,9 @@ export function useChatHistory() {
     setHistory((currentHistory) => {
       if (generated && currentHistory.find((chat) => chat.id === id)?.titleGenerated) return currentHistory;
       const nextHistory = currentHistory.map((chat) => (
-        chat.id === id ? { ...chat, title: cleanTitle, titleGenerated: true, updatedAt: Date.now() } : chat
+        chat.id === id
+          ? { ...chat, title: cleanTitle, titleGenerated: true, titleGenerationAttempted: true, updatedAt: Date.now() }
+          : chat
       ));
       try {
         window.localStorage.setItem(STORAGE_KEY, JSON.stringify(nextHistory));
@@ -116,10 +118,25 @@ export function useChatHistory() {
     });
   }, []);
 
+  const markTitleGenerationAttempted = useCallback((id) => {
+    setHistory((currentHistory) => {
+      if (!currentHistory.some((chat) => chat.id === id && !chat.titleGenerationAttempted)) return currentHistory;
+      const nextHistory = currentHistory.map((chat) => (
+        chat.id === id ? { ...chat, titleGenerationAttempted: true } : chat
+      ));
+      try {
+        window.localStorage.setItem(STORAGE_KEY, JSON.stringify(nextHistory));
+      } catch {
+        // Ignore storage failures; the in-memory chat remains usable.
+      }
+      return nextHistory;
+    });
+  }, []);
+
   const deleteChat = useCallback((id) => {
     persist(history.filter((chat) => chat.id !== id));
     if (activeChatId === id) setActiveChatId(null);
   }, [activeChatId, history, persist, setActiveChatId]);
 
-  return { history, activeChatId, hydrated, setActiveChatId, saveMessages, renameChat, deleteChat };
+  return { history, activeChatId, hydrated, setActiveChatId, saveMessages, renameChat, markTitleGenerationAttempted, deleteChat };
 }

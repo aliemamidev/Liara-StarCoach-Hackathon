@@ -28,9 +28,10 @@ export function ChatLayout() {
   const [screenshotError, setScreenshotError] = useState("");
   const sound = useUiSound();
   const chatHistory = useChatHistory();
-  const { hydrated, activeChatId, history, renameChat } = chatHistory;
+  const { hydrated, activeChatId, history, renameChat, markTitleGenerationAttempted } = chatHistory;
   const activeChat = history.find((chat) => chat.id === activeChatId);
   const loadedChatRef = useRef(null);
+  const messagesViewportRef = useRef(null);
   const titleRequestsRef = useRef(new Set());
   const liveResponseRef = useRef(false);
   const saveMessagesRef = useRef(chatHistory.saveMessages);
@@ -59,8 +60,18 @@ export function ChatLayout() {
   useEffect(() => {
     if (!hydrated || status !== "ready" || !activeChatId || !messages.length) return;
     const chat = history.find((item) => item.id === activeChatId);
-    if (!chat || chat.titleGenerated || titleRequestsRef.current.has(chat.id)) return;
+    const userMessages = messages.filter((message) => message.role === "user");
+    const hasAssistantResponse = messages.some((message) => message.role === "assistant");
+    if (
+      !chat ||
+      chat.titleGenerated ||
+      chat.titleGenerationAttempted ||
+      titleRequestsRef.current.has(chat.id) ||
+      userMessages.length !== 1 ||
+      !hasAssistantResponse
+    ) return;
     titleRequestsRef.current.add(chat.id);
+    markTitleGenerationAttempted(chat.id);
     fetch("/api/chat-title", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
@@ -68,8 +79,8 @@ export function ChatLayout() {
     })
       .then((response) => (response.ok ? response.json() : null))
       .then((result) => result?.title && renameChat(chat.id, result.title, { generated: true }))
-      .catch(() => titleRequestsRef.current.delete(chat.id));
-  }, [activeChatId, hydrated, history, messages, renameChat, status]);
+      .catch(() => {});
+  }, [activeChatId, hydrated, history, markTitleGenerationAttempted, messages, renameChat, status]);
 
   function submitMessage(value = input) {
     const trimmed = value.trim();
@@ -170,11 +181,19 @@ export function ChatLayout() {
 
         onOpenHistory={() => setHistoryOpen(true)}
       />
-      <section className="chat-main">
+      <section ref={messagesViewportRef} className="chat-main">
         {messages.length === 0 ? (
           <ChatEmptyState onSuggestion={submitMessage} />
         ) : (
-          <ChatMessages messages={messages} status={status} onRetry={retry} playSound={sound.playSound} isLive={liveResponseRef.current} />
+          <ChatMessages
+            key={activeChatId || "new-chat"}
+            messages={messages}
+            status={status}
+            onRetry={retry}
+            playSound={sound.playSound}
+            isLive={liveResponseRef.current}
+            scrollContainerRef={messagesViewportRef}
+          />
         )}
         {error && (
           <div className="chat-error" role="alert">
