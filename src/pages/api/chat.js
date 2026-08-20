@@ -7,7 +7,7 @@ import {
 } from "ai";
 import { getAiConfig, isAiConfigured } from "@/lib/ai-config";
 import { formatDocumentationContext, formatDocumentationSources } from "@/lib/docs-search";
-import { createLiaControllerPlan, CLARIFICATION_MESSAGE, DOCUMENTATION_UNAVAILABLE_MESSAGE, LIA_STAGES, PROBABLE_FALLBACK_NOTICE, SCREENSHOT_MESSAGE, validateLiaDraft } from "@/lib/lia-controller";
+import { createLiaControllerPlan, CLARIFICATION_MESSAGE, DOCUMENTATION_UNAVAILABLE_MESSAGE, LIA_STAGES, OUT_OF_SCOPE_MESSAGE, PROBABLE_FALLBACK_NOTICE, SCREENSHOT_MESSAGE, validateLiaDraft } from "@/lib/lia-controller";
 import { LIA_PROBABLE_SYSTEM_PROMPT, LIA_SYSTEM_PROMPT } from "@/lib/lia-persona";
 
 function validMessages(messages) {
@@ -83,6 +83,7 @@ export default async function handler(req, res) {
       includeUsage: true,
     });
     const plan = await createLiaControllerPlan(messages);
+    if (plan.mode === LIA_STAGES.OUT_OF_SCOPE) return await pipeStaticMessage(res, messages, OUT_OF_SCOPE_MESSAGE, plan.stage);
     if (plan.mode === "unavailable") return await pipeStaticMessage(res, messages, DOCUMENTATION_UNAVAILABLE_MESSAGE, plan.stage);
     if (plan.mode === LIA_STAGES.CLARIFICATION) return await pipeStaticMessage(res, messages, CLARIFICATION_MESSAGE, plan.stage);
     if (plan.mode === LIA_STAGES.SCREENSHOT) return await pipeStaticMessage(res, messages, SCREENSHOT_MESSAGE, plan.stage);
