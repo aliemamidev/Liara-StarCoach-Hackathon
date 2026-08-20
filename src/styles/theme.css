@@ -85,6 +85,90 @@ body {
   border-color: hsl(var(--site-border)) !important;
 }
 
+/* The admin dashboard still contains legacy Tailwind color literals. Keep
+   those surfaces and typography aligned with the active theme. */
+.admin-shell,
+.admin-shell button,
+.admin-shell input,
+.admin-shell textarea,
+.admin-shell select {
+  font-family: Vazirmatn, "Yekan Bakh", sans-serif;
+}
+
+.dark .admin-shell {
+  background-color: hsl(var(--site-bg)) !important;
+  color: hsl(var(--site-text));
+}
+
+.dark .admin-shell [class*="bg-[#f5f7fb]"],
+.dark .admin-shell [class*="bg-[#fbfcfe]"],
+.dark .admin-shell [class*="bg-[#f8fafc]"],
+.dark .admin-shell [class*="bg-[#f7f9fc]"],
+.dark .admin-shell [class*="bg-[#f4f7fb]"],
+.dark .admin-shell [class*="bg-[#f3f7fd]"],
+.dark .admin-shell [class*="bg-[#f1f4f8]"],
+.dark .admin-shell [class*="bg-[#eef4fb]"],
+.dark .admin-shell [class*="bg-[#eef2f6]"],
+.dark .admin-shell [class*="bg-[#edf1f5]"],
+.dark .admin-shell [class*="bg-[#edf4ff]"],
+.dark .admin-shell [class*="bg-[#e9f0fb]"],
+.dark .admin-shell [class*="bg-[#e9edf3]"],
+.dark .admin-shell [class*="bg-[#dfe8f7]"],
+.dark .admin-shell [class*="bg-white"] {
+  background-color: hsl(var(--site-surface)) !important;
+}
+
+.dark .admin-shell [class*="text-[#1a2940]"],
+.dark .admin-shell [class*="text-[#1b2b43]"],
+.dark .admin-shell [class*="text-[#1b2a41]"],
+.dark .admin-shell [class*="text-[#1e2d43]"],
+.dark .admin-shell [class*="text-[#23344d]"],
+.dark .admin-shell [class*="text-[#27364d]"],
+.dark .admin-shell [class*="text-[#28384e]"],
+.dark .admin-shell [class*="text-[#293850]"],
+.dark .admin-shell [class*="text-[#2a3a51]"],
+.dark .admin-shell [class*="text-[#2a3b53]"],
+.dark .admin-shell [class*="text-[#33435a]"],
+.dark .admin-shell [class*="text-[#34445b]"],
+.dark .admin-shell [class*="text-[#34445c]"],
+.dark .admin-shell [class*="text-[#3c4b60]"],
+.dark .admin-shell [class*="text-[#4f5f74]"],
+.dark .admin-shell [class*="text-[#536278]"],
+.dark .admin-shell [class*="text-[#54647a]"],
+.dark .admin-shell [class*="text-[#5f6f84]"],
+.dark .admin-shell [class*="text-[#64738a]"],
+.dark .admin-shell [class*="text-[#65738a]"],
+.dark .admin-shell [class*="text-[#66758a]"],
+.dark .admin-shell [class*="text-[#69778b]"],
+.dark .admin-shell [class*="text-[#6e7d91]"],
+.dark .admin-shell [class*="text-[#748198]"],
+.dark .admin-shell [class*="text-[#758298]"],
+.dark .admin-shell [class*="text-[#7e8da1]"],
+.dark .admin-shell [class*="text-[#7f8da0]"],
+.dark .admin-shell [class*="text-[#8190a3]"],
+.dark .admin-shell [class*="text-[#8390a2]"],
+.dark .admin-shell [class*="text-[#8b99ab]"],
+.dark .admin-shell [class*="text-[#8997a8]"],
+.dark .admin-shell [class*="text-[#8a97a8]"],
+.dark .admin-shell [class*="text-[#9aa6b7]"],
+.dark .admin-shell [class*="text-[#9aa8ba]"],
+.dark .admin-shell [class*="text-[#9ba7b6]"],
+.dark .admin-shell [class*="text-[#a1adbc]"],
+.dark .admin-shell [class*="text-[#b0bac8]"] {
+  color: hsl(var(--site-text)) !important;
+}
+
+.dark .admin-shell [class*="border-[#"],
+.dark .admin-shell [class*="divide-[#"] {
+  border-color: hsl(var(--site-border)) !important;
+}
+
+.dark [role="dialog"] {
+  background-color: hsl(var(--site-surface)) !important;
+  border-color: hsl(var(--site-border)) !important;
+  color: hsl(var(--site-text));
+}
+
 /* Shared documentation chrome uses legacy utility colors; keep it on the same theme tokens. */
 header[class*="bg-[#fbfbfb]"],
 sidebar[class*="bg-[#fbfbfb]"] {
