@@ -19,7 +19,7 @@ export function ChatHeader({ title, onOpenSettings, onOpenHistory }) {
           className="h-6 w-auto"
         />
         <div>
-          <p className="text-sm font-bold text-[hsl(var(--chat-text))]">دستیار هوشمند لیارا</p>
+          <p className="text-sm font-bold text-[hsl(var(--chat-text))]">لیا، دستیار هوش مصنوعی لیارا</p>
           <p className="chat-current-title" title={title}>{title}</p>
         </div>
       </div>
@@ -47,7 +47,6 @@ export function ChatHeader({ title, onOpenSettings, onOpenHistory }) {
     </header>
   );
 }
-
 
 
 

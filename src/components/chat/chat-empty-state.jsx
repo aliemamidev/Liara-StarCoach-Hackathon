@@ -12,8 +12,8 @@ export function ChatEmptyState({ onSuggestion }) {
       <div className="chat-empty-mark" aria-hidden="true">
         <Sparkles size={20} />
       </div>
-      <h1 id="chat-empty-title">چطور می‌تونم کمکت کنم؟</h1>
-      <p>پرسش فنی خودت را بپرس تا با هم سریع‌تر به جواب برسیم.</p>
+      <h1 id="chat-empty-title">سلام، من لیا هستم</h1>
+      <p>پرسش فنی‌ات دربارهٔ محصولات و سرویس‌های لیارا را بپرس تا بر اساس Documentation راهنمایی‌ات کنم.</p>
       <div className="chat-suggestions">
         {suggestions.map((suggestion) => (
           <button
@@ -29,7 +29,6 @@ export function ChatEmptyState({ onSuggestion }) {
     </section>
   );
 }
-
 
 
 

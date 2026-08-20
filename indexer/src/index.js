@@ -57,7 +57,8 @@ async function runIndexer() {
     'url',
     'element',
     'src',
-    'type'
+    'type',
+    'body'
   ]);
 }
 

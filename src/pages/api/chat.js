@@ -1,11 +1,34 @@
 import { createOpenAICompatible } from "@ai-sdk/openai-compatible";
 import {
+  createUIMessageStream,
   convertToModelMessages,
   pipeUIMessageStreamToResponse,
   streamText,
   toUIMessageStream,
 } from "ai";
 import { getAiConfig, isAiConfigured } from "@/lib/ai-config";
+import { formatDocumentationContext, searchDocumentation } from "@/lib/docs-search";
+import { LIA_SYSTEM_PROMPT } from "@/lib/lia-persona";
+
+const NO_DOCUMENTATION_MESSAGE = `## پاسخ
+
+در Documentation فعلی لیارا اطلاعات کافی برای پاسخ دقیق به این پرسش پیدا نکردم. لطفاً نام محصول یا سرویس، پلتفرم، نسخه، متن خطا یا Screenshot مربوط به مشکل را ارسال کنید تا بتوانم دقیق‌تر بررسی کنم.
+
+## منبع پاسخ
+
+📄 Documentation:
+
+- منبع مرتبطی در Documentation فعلی پیدا نشد.`;
+
+const DOCUMENTATION_UNAVAILABLE_MESSAGE = `## پاسخ
+
+در حال حاضر جست‌وجوی Documentation لیارا در دسترس نیست؛ بنابراین برای جلوگیری از ارائهٔ اطلاعات نادرست، پاسخ قطعی نمی‌دهم. لطفاً کمی بعد دوباره تلاش کنید.
+
+## منبع پاسخ
+
+📄 Documentation:
+
+- جست‌وجوی Documentation در دسترس نبود.`;
 
 function validMessages(messages) {
   return (
@@ -22,6 +45,28 @@ function validMessages(messages) {
         ),
     )
   );
+}
+
+function latestUserText(messages) {
+  const latestUserMessage = [...messages].reverse().find((message) => message.role === "user");
+  return (latestUserMessage?.parts || [])
+    .filter((part) => part?.type === "text" && typeof part.text === "string")
+    .map((part) => part.text)
+    .join(" ")
+    .trim();
+}
+
+function pipeStaticMessage(response, message) {
+  const stream = createUIMessageStream({
+    execute({ writer }) {
+      const id = globalThis.crypto?.randomUUID?.() || `lia-${Date.now()}`;
+      writer.write({ type: "text-start", id });
+      writer.write({ type: "text-delta", id, delta: message });
+      writer.write({ type: "text-end", id });
+    },
+  });
+
+  return pipeUIMessageStreamToResponse({ response, stream });
 }
 
 export default async function handler(req, res) {
@@ -41,6 +86,14 @@ export default async function handler(req, res) {
   }
 
   try {
+    const documentation = await searchDocumentation(latestUserText(messages));
+    if (!documentation.available) {
+      return await pipeStaticMessage(res, DOCUMENTATION_UNAVAILABLE_MESSAGE);
+    }
+    if (!documentation.hits.length) {
+      return await pipeStaticMessage(res, NO_DOCUMENTATION_MESSAGE);
+    }
+
     const provider = createOpenAICompatible({
       name: "liara-router",
       apiKey: config.apiKey,
@@ -49,7 +102,8 @@ export default async function handler(req, res) {
     });
     const result = streamText({
       model: provider.chatModel(config.model),
-      messages: await convertToModelMessages(messages),
+      system: `${LIA_SYSTEM_PROMPT}\n\nمنابع Documentation بازیابی‌شده:\n${formatDocumentationContext(documentation.hits)}`,
+      messages: await convertToModelMessages(messages.filter((message) => message.role !== "system")),
     });
 
     await pipeUIMessageStreamToResponse({

@@ -59,7 +59,7 @@ export function ChatMessage({ message, onRetry, playSound, isStreaming, isLive }
 
   return (
     <article className={isUser ? "chat-message chat-message-user" : "chat-message chat-message-assistant"}>
-      <div className="chat-message-label">{isUser ? "شما" : "دستیار لیارا"}</div>
+      <div className="chat-message-label">{isUser ? "شما" : "لیا"}</div>
       <div className="chat-message-content">{renderedContent || (isStreaming ? "" : "پاسخی دریافت نشد.")}</div>
       {attachments.length > 0 && (
         <div className="chat-message-attachments">
@@ -79,7 +79,6 @@ export function ChatMessage({ message, onRetry, playSound, isStreaming, isLive }
 }
 
 export { messageText };
-
 
 
 

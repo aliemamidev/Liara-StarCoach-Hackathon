@@ -66,7 +66,7 @@ export function ChatMessages({ messages, status, onRetry, playSound, isLive = fa
         ))}
         {isStreaming && messages[messages.length - 1]?.role === "user" && (
           <div className="chat-message chat-message-assistant" aria-label="در حال دریافت پاسخ">
-            <div className="chat-message-label">دستیار لیارا</div>
+            <div className="chat-message-label">لیا</div>
             <div className="flex items-center gap-2 py-3">
               <Skeleton className="h-2 w-12" />
               <Skeleton className="h-2 w-20" />
@@ -96,7 +96,6 @@ export function ChatMessages({ messages, status, onRetry, playSound, isLive = fa
     </div>
   );
 }
-
 
 
 
