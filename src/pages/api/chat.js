@@ -4,10 +4,9 @@ import {
   convertToModelMessages,
   pipeUIMessageStreamToResponse,
   streamText,
-  toUIMessageStream,
 } from "ai";
 import { getAiConfig, isAiConfigured } from "@/lib/ai-config";
-import { formatDocumentationContext, searchDocumentation } from "@/lib/docs-search";
+import { formatDocumentationContext, formatDocumentationSources, searchDocumentation } from "@/lib/docs-search";
 import { LIA_SYSTEM_PROMPT } from "@/lib/lia-persona";
 
 const NO_DOCUMENTATION_MESSAGE = `## پاسخ
@@ -22,13 +21,13 @@ const NO_DOCUMENTATION_MESSAGE = `## پاسخ
 
 const DOCUMENTATION_UNAVAILABLE_MESSAGE = `## پاسخ
 
-در حال حاضر جست‌وجوی Documentation لیارا در دسترس نیست؛ بنابراین برای جلوگیری از ارائهٔ اطلاعات نادرست، پاسخ قطعی نمی‌دهم. لطفاً کمی بعد دوباره تلاش کنید.
+در حال حاضر خواندن Documentation داخلی در دسترس نیست؛ بنابراین برای جلوگیری از ارائهٔ اطلاعات نادرست، پاسخ قطعی نمی‌دهم. لطفاً کمی بعد دوباره تلاش کنید.
 
 ## منبع پاسخ
 
-📄 Documentation:
+📄 Documentation داخلی:
 
-- جست‌وجوی Documentation در دسترس نبود.`;
+- خواندن فایل‌های Documentation پروژه ممکن نشد.`;
 
 function validMessages(messages) {
   return (
@@ -102,13 +101,22 @@ export default async function handler(req, res) {
     });
     const result = streamText({
       model: provider.chatModel(config.model),
-      system: `${LIA_SYSTEM_PROMPT}\n\nمنابع Documentation بازیابی‌شده:\n${formatDocumentationContext(documentation.hits)}`,
+      system: `${LIA_SYSTEM_PROMPT}\n\nمنابع Documentation داخلی بازیابی‌شده:\n${formatDocumentationContext(documentation.hits)}\n\nمنبع پاسخ را خودت تولید نکن؛ سرور پس از متن پاسخ آن را دقیقاً اضافه می‌کند.`,
       messages: await convertToModelMessages(messages.filter((message) => message.role !== "system")),
     });
 
+    const stream = createUIMessageStream({
+      async execute({ writer }) {
+        const id = globalThis.crypto?.randomUUID?.() || `lia-${Date.now()}`;
+        writer.write({ type: "text-start", id });
+        for await (const chunk of result.textStream) writer.write({ type: "text-delta", id, delta: chunk });
+        writer.write({ type: "text-delta", id, delta: formatDocumentationSources(documentation.hits) });
+        writer.write({ type: "text-end", id });
+      },
+    });
     await pipeUIMessageStreamToResponse({
       response: res,
-      stream: toUIMessageStream({ stream: result.stream }),
+      stream,
     });
   } catch (error) {
     if (!res.headersSent) {
