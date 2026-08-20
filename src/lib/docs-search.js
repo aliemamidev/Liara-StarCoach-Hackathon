@@ -138,6 +138,17 @@ ${hit.body}
 </documentation-source>`).join("\n\n");
 }
 
+export function toInternalDocumentationUrl(value) {
+  if (!value) return "/documentation";
+  try {
+    const url = new URL(value, "https://docs.liara.ir");
+    if (url.hostname === "docs.liara.ir") return `${url.pathname}${url.search}${url.hash}` || "/documentation";
+  } catch {
+    return value;
+  }
+  return value;
+}
+
 export function formatDocumentationSources(hits) {
-  return `\n\n## منبع پاسخ\n\n📄 Documentation:\n\n${hits.map((hit) => `- عنوان سند: ${hit.title}\n  - مسیر فایل: \`${hit.path}\`\n  - لینک: [مشاهده در docs.liara.ir](${hit.url})`).join("\n")}`;
+  return `\n\n## منبع پاسخ\n\n📄 Documentation:\n\n${hits.map((hit) => `- عنوان سند: ${hit.title}\n  - مسیر فایل: \`${hit.path}\`\n  - [مشاهده در Documentation لیارا](${toInternalDocumentationUrl(hit.url)})`).join("\n")}`;
 }

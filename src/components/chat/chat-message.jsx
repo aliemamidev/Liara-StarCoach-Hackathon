@@ -1,5 +1,7 @@
 import { ChatActions } from "@/components/chat/chat-actions";
 import { useEffect, useRef, useState } from "react";
+import ReactMarkdown from "react-markdown";
+import remarkGfm from "remark-gfm";
 
 function messageText(message) {
   return (message.parts || [])
@@ -7,6 +9,21 @@ function messageText(message) {
     .map((part) => part.text)
     .join("");
 }
+
+const markdownComponents = {
+  a: ({ href = "", children, ...props }) => {
+    const isExternal = /^https?:\/\//i.test(href);
+    return (
+      <a
+        href={href}
+        {...props}
+        {...(isExternal ? { target: "_blank", rel: "noreferrer" } : {})}
+      >
+        {children}
+      </a>
+    );
+  },
+};
 
 export function ChatMessage({ message, onRetry, playSound, isStreaming, isLive }) {
   const content = messageText(message);
@@ -60,7 +77,15 @@ export function ChatMessage({ message, onRetry, playSound, isStreaming, isLive }
   return (
     <article className={isUser ? "chat-message chat-message-user" : "chat-message chat-message-assistant"}>
       <div className="chat-message-label">{isUser ? "شما" : "لیا"}</div>
-      <div className="chat-message-content">{renderedContent || (isStreaming ? "" : "پاسخی دریافت نشد.")}</div>
+      <div className={`chat-message-content${isUser ? " chat-message-content-plain" : " chat-message-content-markdown"}`}>
+        {renderedContent ? (
+          isUser ? renderedContent : (
+            <ReactMarkdown remarkPlugins={[remarkGfm]} components={markdownComponents}>
+              {renderedContent}
+            </ReactMarkdown>
+          )
+        ) : (isStreaming ? "" : "پاسخی دریافت نشد.")}
+      </div>
       {attachments.length > 0 && (
         <div className="chat-message-attachments">
           {attachments.map((attachment, index) => (
@@ -79,7 +104,6 @@ export function ChatMessage({ message, onRetry, playSound, isStreaming, isLive }
 }
 
 export { messageText };
-
 
 
 

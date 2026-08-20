@@ -1,12 +1,10 @@
 import { ArrowDown } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
 import { Button } from "@/components/ui/button";
-import { ScrollArea } from "@/components/ui/scroll-area";
 import { Skeleton } from "@/components/ui/skeleton";
 import { ChatMessage } from "@/components/chat/chat-message";
 
 export function ChatMessages({ messages, status, onRetry, playSound, isLive = false }) {
-  const viewportRef = useRef(null);
   const bottomRef = useRef(null);
   const previousMessageCountRef = useRef(messages.length);
   const pinnedToBottomRef = useRef(true);
@@ -15,18 +13,23 @@ export function ChatMessages({ messages, status, onRetry, playSound, isLive = fa
   const isStreaming = status === "submitted" || status === "streaming";
 
   function scrollToBottom(behavior = "auto") {
-    const viewport = viewportRef.current;
-    if (!viewport) return;
-    viewport.scrollTo({ top: viewport.scrollHeight, behavior });
+    if (typeof window === "undefined") return;
+    window.scrollTo({ top: document.documentElement.scrollHeight, behavior });
   }
 
   function handleViewportScroll() {
-    const viewport = viewportRef.current;
-    if (!viewport) return;
-    const pinned = viewport.scrollHeight - viewport.scrollTop - viewport.clientHeight <= 96;
+    if (typeof window === "undefined") return;
+    const documentHeight = document.documentElement.scrollHeight;
+    const pinned = documentHeight - window.scrollY - window.innerHeight <= 96;
     pinnedToBottomRef.current = pinned;
     setShowJumpToLatest(!pinned);
   }
+
+  useEffect(() => {
+    window.addEventListener("scroll", handleViewportScroll, { passive: true });
+    handleViewportScroll();
+    return () => window.removeEventListener("scroll", handleViewportScroll);
+  }, []);
 
   useEffect(() => {
     const lastMessage = messages[messages.length - 1];
@@ -34,12 +37,12 @@ export function ChatMessages({ messages, status, onRetry, playSound, isLive = fa
     if (hasNewMessage && lastMessage?.role === "user") {
       pinnedToBottomRef.current = true;
       setShowJumpToLatest(false);
-      scrollToBottom();
+      requestAnimationFrame(() => scrollToBottom());
     } else if (pinnedToBottomRef.current) {
-      scrollToBottom();
+      requestAnimationFrame(() => scrollToBottom());
     }
     previousMessageCountRef.current = messages.length;
-  }, [messages, status]);
+  }, [messages, status, isLive]);
 
   if ((isStreaming || isLive) && messages[messages.length - 1]?.role === "assistant") {
     liveMessageIdRef.current = messages[messages.length - 1].id;
@@ -47,13 +50,8 @@ export function ChatMessages({ messages, status, onRetry, playSound, isLive = fa
 
   return (
     <div className="chat-messages-wrap">
-      <ScrollArea
-        className="chat-messages"
-        viewportRef={viewportRef}
-        onViewportScroll={handleViewportScroll}
-        aria-live="polite"
-      >
-      <div className="chat-message-list">
+      <div className="chat-messages" aria-live="polite">
+        <div className="chat-message-list">
         {messages.map((message, index) => (
           <ChatMessage
             key={message.id}
@@ -75,8 +73,8 @@ export function ChatMessages({ messages, status, onRetry, playSound, isLive = fa
           </div>
         )}
         <div ref={bottomRef} aria-hidden="true" />
+        </div>
       </div>
-      </ScrollArea>
       {showJumpToLatest && (
         <Button
           type="button"
@@ -96,7 +94,6 @@ export function ChatMessages({ messages, status, onRetry, playSound, isLive = fa
     </div>
   );
 }
-
 
 
 
