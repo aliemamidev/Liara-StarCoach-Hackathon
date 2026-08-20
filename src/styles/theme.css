@@ -121,6 +121,95 @@ sidebar[class*="bg-[#fbfbfb]"] .badge {
   border-color: hsl(var(--site-border));
 }
 
+/* Admin layout guardrails: preserve desktop geometry while preventing mobile leaks. */
+.admin-shell {
+  min-width: 0;
+  overflow-x: clip;
+}
+
+.admin-shell main,
+.admin-shell main > div,
+.admin-shell .admin-card,
+.admin-shell .admin-card > div {
+  min-width: 0;
+}
+
+.admin-shell .admin-card {
+  max-width: 100%;
+}
+
+.admin-shell .overflow-x-auto {
+  max-width: 100%;
+  overscroll-behavior-x: contain;
+}
+
+.admin-shell button,
+.admin-shell input,
+.admin-shell [role="switch"] {
+  touch-action: manipulation;
+}
+
+[role="dialog"] {
+  max-width: calc(100vw - 1rem);
+  max-height: calc(100dvh - 1rem);
+  overflow-x: hidden;
+  overflow-y: auto;
+}
+
+@media (max-width: 639px) {
+  .admin-shell button {
+    min-height: 44px;
+  }
+
+  .admin-shell button[aria-label],
+  .admin-shell [role="switch"] {
+    min-width: 44px;
+  }
+
+  .admin-shell .admin-card:not([class*="p-0"]) {
+    padding: 1rem !important;
+    border-radius: 1.125rem;
+  }
+
+  .admin-shell header > div {
+    min-width: 0;
+  }
+
+  .admin-shell .admin-card > div[class~="mb-8"][class~="flex"][class~="items-center"][class~="justify-between"] {
+    align-items: flex-start;
+    flex-direction: column;
+    gap: 1rem;
+  }
+
+  .admin-shell .admin-card > div[class~="mb-5"][class~="flex"][class~="items-center"][class~="justify-between"] {
+    flex-wrap: wrap;
+  }
+
+  .admin-shell .admin-card > div[class~="mb-5"] > div {
+    min-width: 0;
+  }
+
+  .admin-shell .admin-card div[class~="h-48"],
+  .admin-shell .admin-card div[class~="h-64"] {
+    min-width: 0;
+  }
+
+  .admin-shell .admin-card .overflow-x-auto {
+    max-width: calc(100vw - 2rem);
+  }
+}
+
+@media (max-width: 767px) {
+  /* Keep the compact header usable through the tablet breakpoint. */
+  .admin-shell header > div > div.relative,
+  .admin-shell header button[aria-label="به‌روزرسانی داده‌ها"],
+  .admin-shell header button[aria-pressed],
+  .admin-shell header button[class*="text-right"][class*="hidden"],
+  .admin-shell header > div > div.mr-auto > div.mx-1 {
+    display: none;
+  }
+}
+
 @media (prefers-reduced-motion: reduce) {
   .login-visual-grid,
   .admin-auth-orb {

@@ -31,7 +31,7 @@ export function DialogContent({ className, children, ...props }) {
         {...props}
       >
         {children}
-        <DialogPrimitive.Close className="absolute left-4 top-4 rounded-lg p-2 text-[hsl(var(--chat-muted))] hover:bg-[hsl(var(--chat-surface-muted))] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[hsl(var(--chat-accent))]">
+        <DialogPrimitive.Close className="absolute left-3 top-3 flex h-11 w-11 items-center justify-center rounded-xl text-[hsl(var(--chat-muted))] hover:bg-[hsl(var(--chat-surface-muted))] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[hsl(var(--chat-accent))]">
           <X size={17} aria-hidden="true" />
           <span className="sr-only">بستن</span>
         </DialogPrimitive.Close>
@@ -49,7 +49,6 @@ export const DialogTitle = ({ className, ...props }) => (
 export const DialogDescription = ({ className, ...props }) => (
   <DialogPrimitive.Description className={cn("text-sm leading-6 text-[hsl(var(--chat-muted))]", className)} {...props} />
 );
-
 
 
 

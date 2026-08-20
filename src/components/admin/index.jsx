@@ -114,7 +114,7 @@ function StatusBadge({ status, children }) {
   };
   const icons = { answered: CheckCircle2, review: Clock3, failed: XCircle };
   const StatusIcon = icons[status] || CircleDot;
-  return <span className={`inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-[11px] font-bold ${styles[status] || "bg-slate-100 text-slate-600"}`}><StatusIcon size={13} />{children}</span>;
+  return <span className={`inline-flex shrink-0 items-center gap-1.5 whitespace-nowrap rounded-full px-2.5 py-1 text-[11px] font-bold ${styles[status] || "bg-slate-100 text-slate-600"}`}><StatusIcon size={13} />{children}</span>;
 }
 
 function AdminSidebar({ activeSection, onNavigate, onLogout, user, mobile = false }) {
@@ -157,7 +157,7 @@ function AdminSidebar({ activeSection, onNavigate, onLogout, user, mobile = fals
         <div className="flex items-center gap-3 border-t border-[#2a3b56] pt-4">
           <UserAvatar initials="س‌ک" tone="teal" size="sm" />
           <div className="min-w-0 flex-1"><p className="truncate text-[12px] font-bold text-white">{user?.name || "مدیر لیارا"}</p><p className="truncate text-[10px] text-[#8295ad]">مدیر سیستم</p></div>
-          <button type="button" onClick={onLogout} aria-label="خروج از پنل" className="flex h-9 w-9 items-center justify-center rounded-lg text-[#8295ad] transition hover:bg-white/10 hover:text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#64e4d2]"><LogOut size={16} /></button>
+          <button type="button" onClick={onLogout} aria-label="خروج از پنل" className="flex h-11 w-11 items-center justify-center rounded-xl text-[#8295ad] transition hover:bg-white/10 hover:text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#64e4d2]"><LogOut size={16} /></button>
         </div>
       </div>
     </div>
@@ -165,11 +165,11 @@ function AdminSidebar({ activeSection, onNavigate, onLogout, user, mobile = fals
 }
 
 function Card({ className = "", children }) {
-  return <section className={`rounded-[22px] border border-[#e7ecf2] bg-white shadow-[0_10px_35px_rgba(32,58,91,.045)] ${className}`}>{children}</section>;
+  return <section className={`admin-card rounded-[22px] border border-[#e7ecf2] bg-white shadow-[0_10px_35px_rgba(32,58,91,.045)] ${className}`}>{children}</section>;
 }
 
 function SectionTitle({ label, action, onAction }) {
-  return <div className="mb-5 flex items-center justify-between gap-4"><div><h2 className="text-[15px] font-extrabold text-[#1b2a41]">{label}</h2></div>{action && <button type="button" onClick={onAction} className="flex items-center gap-1 text-[11px] font-bold text-[#5273a2] transition hover:text-[#2b58a1]">{action}<ChevronLeft size={14} /></button>}</div>;
+  return <div className="mb-5 flex flex-wrap items-center justify-between gap-3"><div className="min-w-0"><h2 className="text-[15px] font-extrabold text-[#1b2a41]">{label}</h2></div>{action && <button type="button" onClick={onAction} className="flex min-h-11 shrink-0 items-center gap-1 text-[11px] font-bold text-[#5273a2] transition hover:text-[#2b58a1]">{action}<ChevronLeft size={14} /></button>}</div>;
 }
 
 function Sparkline({ values, tone }) {
@@ -234,7 +234,7 @@ function UsersPage() {
 }
 
 function ToggleRow({ icon: RowIcon, title, description, checked, onChange }) {
-  return <div className="flex items-center gap-4 border-b border-[#edf0f4] py-4 last:border-0"><span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-[#eff4fb] text-[#5c7db7]"><RowIcon size={18} /></span><div className="min-w-0 flex-1"><p className="text-[12px] font-extrabold text-[#33435a]">{title}</p><p className="mt-1 text-[10px] leading-5 text-[#8a97a8]">{description}</p></div><button type="button" role="switch" aria-checked={checked} onClick={() => onChange(!checked)} className={`relative h-6 w-11 shrink-0 rounded-full transition ${checked ? "bg-[#18a996]" : "bg-[#d8e0e9]"}`}><span className={`absolute top-1 h-4 w-4 rounded-full bg-white shadow-sm transition ${checked ? "right-1" : "right-6"}`} /></button></div>;
+  return <div className="flex items-center gap-4 border-b border-[#edf0f4] py-4 last:border-0"><span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-[#eff4fb] text-[#5c7db7]"><RowIcon size={18} /></span><div className="min-w-0 flex-1"><p className="text-[12px] font-extrabold text-[#33435a]">{title}</p><p className="mt-1 text-[10px] leading-5 text-[#8a97a8]">{description}</p></div><button type="button" role="switch" aria-checked={checked} onClick={() => onChange(!checked)} className={`relative flex h-11 w-12 shrink-0 items-center rounded-full transition ${checked ? "bg-[#18a996]" : "bg-[#d8e0e9]"}`}><span className={`absolute top-3 h-5 w-5 rounded-full bg-white shadow-sm transition ${checked ? "right-1" : "right-6"}`} /></button></div>;
 }
 
 function SettingsPage() {
@@ -299,7 +299,7 @@ function AdminDashboardShell({ session }) {
 
   return <>
     <Head><title>پنل مدیریت لیارا</title><meta name="description" content="پنل مانیتورینگ و مدیریت دستیار هوشمند لیارا" /></Head>
-    <div dir="rtl" className="admin-shell min-h-screen bg-[#f5f7fb] text-[#1a2940] selection:bg-[#bcefe7] selection:text-[#143b3a]">
+    <div dir="rtl" className="admin-shell min-h-dvh bg-[#f5f7fb] text-[#1a2940] selection:bg-[#bcefe7] selection:text-[#143b3a]">
       <aside className="fixed inset-y-0 right-0 z-30 hidden w-72 bg-[#14233a] lg:block"><AdminSidebar activeSection={activeSection} onNavigate={navigate} onLogout={logout} user={user} /></aside>
       <Sheet open={mobileOpen} onOpenChange={setMobileOpen}><SheetContent side="right" className="w-[285px] border-[#2a3b56] bg-[#14233a] p-0 text-white"><AdminSidebar activeSection={activeSection} onNavigate={navigate} onLogout={logout} user={user} mobile /></SheetContent></Sheet>
       <div className="lg:pr-72"><AdminHeader onMenu={() => setMobileOpen(true)} onNavigate={navigate} onRefresh={refresh} onLogout={logout} user={user} /><main className="px-4 py-6 sm:px-7 lg:px-10 lg:py-8"><div className="mx-auto max-w-[1500px]"><div className="mb-7 flex flex-col justify-between gap-5 md:flex-row md:items-end"><div><div className="mb-3 flex items-center gap-2 text-[10px] font-bold tracking-[0.12em] text-[#7e8da1]"><span className="h-1.5 w-1.5 rounded-full bg-[#18a996]" />{meta.eyebrow}</div><h1 className="text-[25px] font-extrabold tracking-tight text-[#1b2b43] sm:text-[30px]">{meta.title}</h1><p className="mt-2 max-w-2xl text-xs leading-6 text-[#8390a2]">{meta.description}</p></div><div className="flex items-center gap-2"><span className="hidden text-[10px] font-semibold text-[#9aa6b7] sm:inline">آخرین به‌روزرسانی: {lastUpdated}</span><Button variant="outline" size="sm" className="h-10 border-[#e2e8f0] bg-white text-xs text-[#5f6f84]" onClick={refresh}><RotateCcw size={14} />به‌روزرسانی</Button></div></div>{loading ? <div className="grid gap-5"><Card className="flex min-h-[420px] items-center justify-center"><div className="text-center"><span className="mx-auto flex h-11 w-11 animate-pulse items-center justify-center rounded-2xl bg-[#e9f0fb] text-[#5b7fc1]"><Wifi size={20} /></span><p className="mt-4 text-sm font-bold text-[#54647a]">در حال دریافت داده‌ها...</p><p className="mt-1 text-[11px] text-[#9aa6b7]">این صفحه لحظه‌ای دیگر آماده است.</p></div></Card></div> : activeSection === "dashboard" ? <DashboardPage onSelect={setSelectedMessage} onNavigate={navigate} /> : activeSection === "messages" ? <MessagesPage onSelect={setSelectedMessage} /> : activeSection === "unanswered" ? <UnansweredPage items={unknownItems} onResolve={(id) => setUnknownItems((current) => current.filter((item) => item.id !== id))} onSelect={setSelectedMessage} /> : activeSection === "analytics" ? <AnalyticsPage /> : activeSection === "users" ? <UsersPage /> : <SettingsPage />}</div></main></div>
