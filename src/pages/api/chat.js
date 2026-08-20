@@ -7,7 +7,7 @@ import {
 } from "ai";
 import { getAiConfig, isAiConfigured } from "@/lib/ai-config";
 import { formatDocumentationContext, formatDocumentationSources } from "@/lib/docs-search";
-import { createLiaControllerPlan, CLARIFICATION_MESSAGE, DOCUMENTATION_UNAVAILABLE_MESSAGE, LIA_STAGES, OUT_OF_SCOPE_MESSAGE, PROBABLE_FALLBACK_NOTICE, SCREENSHOT_MESSAGE, validateLiaDraft } from "@/lib/lia-controller";
+import { AI_UNAVAILABLE_MESSAGE, createLiaControllerPlan, CLARIFICATION_MESSAGE, DOCUMENTATION_UNAVAILABLE_MESSAGE, isUnsafeLiaDraft, LIA_STAGES, OUT_OF_SCOPE_MESSAGE, PROBABLE_FALLBACK_NOTICE, SCREENSHOT_MESSAGE, UNSAFE_DRAFT_MESSAGE, validateLiaDraft } from "@/lib/lia-controller";
 import { LIA_PROBABLE_SYSTEM_PROMPT, LIA_SYSTEM_PROMPT } from "@/lib/lia-persona";
 
 function validMessages(messages) {
@@ -89,7 +89,11 @@ export default async function handler(req, res) {
     if (plan.mode === LIA_STAGES.SCREENSHOT) return await pipeStaticMessage(res, messages, SCREENSHOT_MESSAGE, plan.stage);
 
     let answer = await generateDraft(provider, config, messages, plan);
-    if (!validateLiaDraft(answer)) answer = await generateDraft(provider, config, messages, plan, true);
+    if (!validateLiaDraft(answer)) {
+      if (isUnsafeLiaDraft(answer)) return await pipeStaticMessage(res, messages, UNSAFE_DRAFT_MESSAGE, plan.stage);
+      answer = await generateDraft(provider, config, messages, plan, true);
+    }
+    if (isUnsafeLiaDraft(answer)) return await pipeStaticMessage(res, messages, UNSAFE_DRAFT_MESSAGE, plan.stage);
     if (!validateLiaDraft(answer)) {
       return await pipeStaticMessage(res, messages, DOCUMENTATION_UNAVAILABLE_MESSAGE, LIA_STAGES.CLARIFICATION);
     }
@@ -114,7 +118,8 @@ export default async function handler(req, res) {
     });
   } catch (error) {
     if (!res.headersSent) {
-      return res.status(502).json({ error: "دریافت پاسخ از ایجنت ممکن نشد." });
+      const providerUnavailable = error?.statusCode === 403 || error?.data?.error?.code === "pre_consume_token_quota_failed";
+      return res.status(providerUnavailable ? 503 : 502).json({ error: providerUnavailable ? AI_UNAVAILABLE_MESSAGE : "دریافت پاسخ از ایجنت ممکن نشد." });
     }
     res.end();
   }

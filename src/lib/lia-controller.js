@@ -31,6 +31,14 @@ export const DOCUMENTATION_UNAVAILABLE_MESSAGE = `## پاسخ
 
 در حال حاضر خواندن Documentation داخلی لیارا در دسترس نیست؛ بنابراین برای جلوگیری از ارائهٔ اطلاعات نادرست، پاسخ قطعی نمی‌دهم. لطفاً کمی بعد دوباره تلاش کنید.`;
 
+export const UNSAFE_DRAFT_MESSAGE = `## پاسخ
+
+نمی‌تونم دستورهای مخرب یا اطلاعات داخلی سیستم را ارائه کنم. اگر هدفت حل یک مشکل فنی است، راهکار امن و قابل بازگشتش را توضیح می‌دهم.`;
+
+export const AI_UNAVAILABLE_MESSAGE = `## پاسخ
+
+سرویس پاسخ‌گویی هوش مصنوعی موقتاً در دسترس نیست. لطفاً کمی بعد دوباره تلاش کنید.`;
+
 export const OUT_OF_SCOPE_MESSAGE = "من فقط دربارهٔ سرویس‌های لیارا و مفاهیم فنی مرتبط کمک می‌کنم. اگر سؤال فنی یا مربوط به لیارا داری، خوشحال می‌شم راهنماییت کنم.";
 
 export const PROBABLE_FALLBACK_NOTICE = `## پاسخ احتمالی و غیرمستند
@@ -103,12 +111,14 @@ function hasImageAttachment(messages) {
 }
 
 const IN_SCOPE_PATTERN = /(?:هوش مصنوعی|یادگیری ماشین|یادگیری ماشینی|مدل زبان|چت‌?بات|الگوریتم|پرامپت|توکن|پردازش متن|تکنولوژی|فناوری|کامپیوتر|رایانه|برنامه‌نویسی|برنامه نویسی|کدنویسی|کد|پایتون|جاوااسکریپت|تایپ‌?اسکریپت|جاوا|php|node(?:\.js)?|react|next(?:\.js)?|vue|sql|api|sdk|http|سرور|کلود|ابری|دیتابیس|پایگاه داده|داده|شبکه|امنیت|رمزنگاری|لینوکس|ویندوز|گیت|docker|کانتینر|استقرار|دیپلوی|deploy|دامنه|dns|وب‌?سایت|سایت|اپلیکیشن|نرم‌افزار|نرم افزار|لینک|فایل|خطا|ارور|لاگ|پایگاه دانش|مستندات|documentation|لیارا|liara|پنل|حساب کاربری|سرویس|صورتحساب|فاکتور|ذخیره‌?سازی|پشتیبان|بکاپ|redis|mysql|mongodb|postgres|آی‌?پی|پورت|ssl|tls|ssh|cors|cdn|github|gitlab|اسکرین‌?شات|screenshot)/iu;
+const TECHNICAL_SYMPTOM_PATTERN = /(?:برنامه\s*(?:م|ام|من)|اپلیکیشن\s*(?:م|ام|من)|سایت\s*(?:م|ام|من)|کار نمی\s*(?:کند|کنه)|درست نیست|خراب شده|مشکل دارم|خطا دارم|ارور دارم)/iu;
 
 const GENERAL_TECHNICAL_EXPLANATION_PATTERN = /(?:چیست|چیستند|یعنی چه|چه تفاوتی|تفاوت|تعریف|معنی|چگونه کار می\s*کند|چطور کار می\s*کند|توضیح بده|معرفی کن|what is|what are|difference between|how does .* work)/iu;
 const LIARA_SPECIFIC_PATTERN = /(?:لیارا|liara|پنل|قیمت|پلن|صورتحساب|فاکتور|سرویس لیارا|مستندات لیارا|حساب کاربری|دامنه\s*من|دامنه\s*ام|اپلیکیشن\s*من|برنامه\s*ام|در لیارا|روی لیارا)/iu;
 
 export function isLikelyInScope(query) {
-  return IN_SCOPE_PATTERN.test(normalizeText(query));
+  const normalizedQuery = normalizeText(query);
+  return IN_SCOPE_PATTERN.test(normalizedQuery) || TECHNICAL_SYMPTOM_PATTERN.test(normalizedQuery);
 }
 
 function isGeneralTechnicalQuery(query) {
@@ -123,7 +133,7 @@ function hasInsufficientDescription(query) {
   return queryTokens.length < 3 || /^(کمک|مشکل دارم|کار نمی‌کند|کار نمیکند|خطا|ارور|درست نیست|نمی‌شود|نمیشه|help|error)$/i.test(normalizeText(query));
 }
 
-const VISUAL_DIAGNOSTIC_PATTERN = /(?:خطا|ارور|کار نمی‌کند|کار نمیکند|درست اجرا نمی‌شود|درست اجرا نمیشود|باگ|رفتار غیرمنتظره|نمایش داده نمی‌شود|نمایش داده نمیشود|ظاهر خراب|صفحه سفید|صفحه سیاه|پیام خطا|اسکرین‌?شات|screenshot|error|bug|not working|unexpected)/iu;
+const VISUAL_DIAGNOSTIC_PATTERN = /(?:خطا|ارور|کار نمی\s*(?:کند|کنه)|درست اجرا نمی\s*شود|باگ|رفتار غیرمنتظره|نمایش داده نمی\s*شود|ظاهر خراب|صفحه سفید|صفحه سیاه|پیام خطا|اسکرین‌?شات|screenshot|error|bug|not working|unexpected)/iu;
 const VISUAL_CONTEXT_PATTERN = /(?:صفحه|پنل|تنظیمات|رابط کاربری|ظاهر|نمایش)/iu;
 
 function needsVisualDiagnosis(query) {
@@ -194,11 +204,19 @@ export async function createLiaControllerPlan(messages) {
   return { mode: stage, stage, query, hits: [] };
 }
 
+const INTERNAL_OUTPUT_PATTERN = /system prompt|developer message|internal reasoning|زنجیرهٔ فکر|تحلیل داخلی|پرامپت\s*سیستم|قوانین\s*داخلی|دستورهای\s*داخلی/i;
+const DANGEROUS_COMMAND_PATTERN = /(?:rm\s+-rf|docker\s+system\s+prune(?:\s+-a)?|DROP\s+DATABASE|TRUNCATE\s+TABLE|git\s+push\s+--force|kubectl\s+delete\s+.*--all)/i;
+
+export function isUnsafeLiaDraft(text) {
+  const value = String(text || "");
+  return INTERNAL_OUTPUT_PATTERN.test(value) || DANGEROUS_COMMAND_PATTERN.test(value);
+}
+
 export function validateLiaDraft(text) {
   const value = String(text || "").trim();
   if (!value || value.length > 12000) return false;
   if (!value.includes("## پاسخ")) return false;
   if (/##\s*منبع پاسخ|<documentation-source|https?:\/\//i.test(value)) return false;
-  if (/system prompt|developer message|internal reasoning|زنجیرهٔ فکر|تحلیل داخلی/i.test(value)) return false;
+  if (isUnsafeLiaDraft(value)) return false;
   return true;
 }
