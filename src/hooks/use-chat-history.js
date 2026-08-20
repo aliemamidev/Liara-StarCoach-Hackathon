@@ -81,6 +81,7 @@ export function useChatHistory() {
     const nextChat = {
       id,
       title: existing?.title || title,
+      titleGenerated: existing?.titleGenerated || false,
       createdAt: existing?.createdAt || now,
       updatedAt: now,
       messages: serializeMessages(messages),
@@ -91,12 +92,19 @@ export function useChatHistory() {
     return id;
   }, [activeChatId, history, persist, setActiveChatId]);
 
+  const renameChat = useCallback((id, title) => {
+    const cleanTitle = title?.trim().slice(0, 60);
+    if (!cleanTitle) return;
+    persist(history.map((chat) => (
+      chat.id === id ? { ...chat, title: cleanTitle, titleGenerated: true, updatedAt: Date.now() } : chat
+    )));
+  }, [history, persist]);
+
   const deleteChat = useCallback((id) => {
     persist(history.filter((chat) => chat.id !== id));
     if (activeChatId === id) setActiveChatId(null);
   }, [activeChatId, history, persist, setActiveChatId]);
 
-  return { history, activeChatId, hydrated, setActiveChatId, saveMessages, deleteChat };
+  return { history, activeChatId, hydrated, setActiveChatId, saveMessages, renameChat, deleteChat };
 }
-
 

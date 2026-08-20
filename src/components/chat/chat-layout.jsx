@@ -26,7 +26,9 @@ export function ChatLayout() {
   const [screenshotError, setScreenshotError] = useState("");
   const sound = useUiSound();
   const chatHistory = useChatHistory();
+  const { hydrated, activeChatId, history, renameChat } = chatHistory;
   const loadedChatRef = useRef(null);
+  const titleRequestsRef = useRef(new Set());
   const saveMessagesRef = useRef(chatHistory.saveMessages);
   saveMessagesRef.current = chatHistory.saveMessages;
   const transport = useMemo(() => new DefaultChatTransport({ api: "/api/chat" }), []);
@@ -50,6 +52,21 @@ export function ChatLayout() {
     if (chatHistory.hydrated && status === "ready" && messages.length) saveMessagesRef.current(messages);
   }, [messages, status, chatHistory.hydrated]);
 
+  useEffect(() => {
+    if (!hydrated || status !== "ready" || !activeChatId || !messages.length) return;
+    const chat = history.find((item) => item.id === activeChatId);
+    if (!chat || chat.titleGenerated || titleRequestsRef.current.has(chat.id)) return;
+    titleRequestsRef.current.add(chat.id);
+    fetch("/api/chat-title", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ messages }),
+    })
+      .then((response) => (response.ok ? response.json() : null))
+      .then((result) => result?.title && renameChat(chat.id, result.title))
+      .catch(() => titleRequestsRef.current.delete(chat.id));
+  }, [activeChatId, hydrated, history, messages, renameChat, status]);
+
   function submitMessage(value = input) {
     const trimmed = value.trim();
     if ((!trimmed && !files.length) || status === "submitted" || status === "streaming") return;
@@ -65,6 +82,7 @@ export function ChatLayout() {
 
 
   function startNewChat() {
+    titleRequestsRef.current.clear();
     chatHistory.setActiveChatId(null);
     setMessages([]);
     setFiles([]);
@@ -154,7 +172,5 @@ export function ChatLayout() {
     </main>
   );
 }
-
-
 
 
