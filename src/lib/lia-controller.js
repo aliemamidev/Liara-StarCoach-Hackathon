@@ -3,6 +3,7 @@ import { searchDocumentation, searchDocumentationOnline } from "@/lib/docs-searc
 export const LIA_STAGES = Object.freeze({
   ANSWER: "answer",
   CLARIFICATION: "clarification",
+  SCREENSHOT: "screenshot",
   PROBABLE: "probable",
 });
 
@@ -10,7 +11,16 @@ const QUERY_TOKEN_PATTERN = /[\p{L}\p{N}]+/gu;
 
 export const CLARIFICATION_MESSAGE = `## پرسش تکمیلی
 
-برای اینکه پاسخ دقیق و قابل اتکایی بدهم، لطفاً نام محصول یا سرویس، پلتفرم، نسخه، متن خطا و در صورت امکان Screenshot یا بخشی از تنظیمات مرتبط را ارسال کنید.`;
+برای اینکه بهتر راهنمایی‌تان کنم، مشکل دقیقاً در کدام بخش یا صفحه دیده می‌شود؟`;
+
+export const SCREENSHOT_MESSAGE = `## درخواست Screenshot
+
+اگر توضیح مشکل سخت است، اشکالی ندارد. با دیدن تصویر صفحه می‌توانم مشکل را دقیق‌تر بررسی کنم:
+
+1. از صفحه‌ای که مشکل را در آن می‌بینید Screenshot بگیرید.
+2. در همین چت، از منوی «افزودن» گزینهٔ «Screenshot» را انتخاب کنید؛ یا تصویر را با گزینهٔ «افزودن فایل» پیوست و ارسال کنید.
+
+اگر داخل تصویر رمز عبور، شماره کارت، توکن، API Key یا اطلاعات محرمانه‌ای هست، قبل از ارسال آن بخش را مخفی کنید.`;
 
 export const DOCUMENTATION_UNAVAILABLE_MESSAGE = `## پاسخ
 
@@ -80,12 +90,35 @@ function previousStage(messages) {
   return assistant?.metadata?.liaStage;
 }
 
+function hasImageAttachment(messages) {
+  const latestUserMessage = [...messages].reverse().find((message) => message.role === "user");
+  return (latestUserMessage?.parts || []).some((part) => part?.type === "file" && String(part.mediaType || "").startsWith("image/"));
+}
+
+function hasInsufficientDescription(query) {
+  const queryTokens = [...new Set(tokens(query))];
+  return queryTokens.length < 3 || /^(کمک|مشکل دارم|کار نمی‌کند|کار نمیکند|خطا|ارور|درست نیست|نمی‌شود|نمیشه|help|error)$/i.test(normalizeText(query));
+}
+
 function shouldSearchOnline(hits, query) {
   return !isStrongEvidence(hits, query);
 }
 
 export async function createLiaControllerPlan(messages) {
   const query = latestUserText(messages);
+  const priorStage = previousStage(messages);
+
+  if (hasImageAttachment(messages)) {
+    return { mode: LIA_STAGES.PROBABLE, stage: LIA_STAGES.PROBABLE, query, hits: [] };
+  }
+
+  if (hasInsufficientDescription(query)) {
+    const stage = priorStage === LIA_STAGES.CLARIFICATION
+      ? LIA_STAGES.SCREENSHOT
+      : LIA_STAGES.CLARIFICATION;
+    return { mode: stage, stage, query, hits: [] };
+  }
+
   const local = await searchDocumentation(query);
   let hits = local.hits;
   let documentationAvailable = local.available;
@@ -114,8 +147,8 @@ export async function createLiaControllerPlan(messages) {
     };
   }
 
-  const stage = previousStage(messages) === LIA_STAGES.CLARIFICATION
-    ? LIA_STAGES.PROBABLE
+  const stage = priorStage === LIA_STAGES.CLARIFICATION
+    ? LIA_STAGES.SCREENSHOT
     : LIA_STAGES.CLARIFICATION;
 
   return { mode: stage, stage, query, hits: [] };
