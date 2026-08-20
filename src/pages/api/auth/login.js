@@ -2,6 +2,7 @@ import { prisma } from "@/lib/prisma";
 import {
   createAdminSession,
   getPublicUser,
+  hashPassword,
   isValidEmail,
   normalizeEmail,
   verifyPassword,
@@ -20,7 +21,23 @@ export default async function handler(req, res) {
   }
 
   try {
-    const user = await prisma.user.findUnique({ where: { email } });
+    let user = await prisma.user.findUnique({ where: { email } });
+    const configuredAdminEmail = normalizeEmail(process.env.ADMIN_EMAIL);
+    const configuredAdminPassword = String(process.env.ADMIN_PASSWORD || "");
+
+    // Bootstrap the configured admin on first login, so copying the env file
+    // does not require a separate seed step on a fresh local database.
+    if (!user && email === configuredAdminEmail && password === configuredAdminPassword && password.length >= 8) {
+      user = await prisma.user.create({
+        data: {
+          email,
+          name: "مدیر لیارا",
+          passwordHash: await hashPassword(password),
+          role: "ADMIN",
+          isActive: true,
+        },
+      });
+    }
     const valid = user && user.isActive && user.role === "ADMIN" && await verifyPassword(password, user.passwordHash);
     if (!valid) return res.status(401).json({ message: "ایمیل یا رمز عبور نادرست است." });
 
