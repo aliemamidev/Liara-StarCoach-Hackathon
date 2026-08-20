@@ -1,4 +1,5 @@
 import Head from "next/head";
+import Image from "next/image";
 import { useEffect, useMemo, useState } from "react";
 import {
   AlertTriangle,
@@ -90,7 +91,7 @@ function Brand() {
   return (
     <div className="flex items-center gap-3">
       <div className="relative flex h-11 w-11 items-center justify-center overflow-hidden rounded-2xl bg-[#64e4d2] text-[#0e2335] shadow-[0_8px_24px_rgba(100,228,210,.2)]">
-        <Sparkles size={20} strokeWidth={2.4} />
+        <Image src="/static/logo.svg" alt="لیارا" width={34} height={15} priority className="h-auto w-[34px] object-contain" />
         <span className="absolute -bottom-3 -left-2 h-7 w-7 rounded-full border-2 border-[#142139] bg-[#f49a58]" />
       </div>
       <div>

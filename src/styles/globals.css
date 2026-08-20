@@ -1148,6 +1148,7 @@ pre code {
 .chat-history-edit { display: flex; min-width: 0; flex: 1; align-items: center; gap: 2px; }
 .chat-history-edit input { min-width: 0; flex: 1; border: 1px solid hsl(var(--chat-accent)); border-radius: 9px; background: hsl(var(--chat-surface)); padding: 7px 9px; color: hsl(var(--chat-text)); font: inherit; font-size: 12px; outline: none; }
 .chat-current-title { max-width: 260px; overflow: hidden; color: hsl(var(--chat-muted)); font-size: 12px; text-overflow: ellipsis; white-space: nowrap; }
+.chat-header-docs-action { display: none; }
 .chat-screenshot-overlay { position: fixed; inset: 0; z-index: 100; cursor: crosshair; background: hsl(222 22% 8% / 0.48); }
 .screenshot-source-dialog { max-width: 560px; }
 .screenshot-source-card { display: flex; align-items: center; gap: 14px; min-height: 132px; border: 1px solid hsl(var(--chat-border)); border-radius: 18px; background: hsl(var(--chat-surface)); padding: 20px; box-shadow: 0 12px 32px hsl(var(--chat-text) / 0.06); }
@@ -1165,7 +1166,7 @@ pre code {
 .dark .layout .text-\[gray\], .dark .layout .text-\[\#707070\] { color: hsl(var(--chat-muted)) !important; }
 .dark body { background: hsl(var(--chat-bg)) !important; }
 @media (max-width: 640px) { .chat-screenshot-toolbar { top: 10px; max-width: calc(100% - 20px); } .chat-screenshot-toolbar span { overflow: hidden; text-overflow: ellipsis; } }
-@media (max-width: 640px) { .chat-header { padding: 14px 16px; } .chat-main { padding-inline: 12px; } .chat-message-user { max-width: 92%; } .chat-composer-wrap { padding-inline: 12px; } .chat-composer-hint { display: none; } .chat-docs-link { bottom: max(72px, calc(env(safe-area-inset-bottom) + 56px)); left: 12px; } .chat-docs-link span { display: none; } }
+@media (max-width: 640px) { .chat-header { padding: 12px 12px; } .chat-header-actions { flex: 0 0 auto; gap: 2px; } .chat-header-action { min-height: 44px; min-width: 44px; } .chat-header-action svg { height: 21px; width: 21px; } .chat-header-docs-action { display: inline-flex; } .chat-header > div:first-child { min-width: 0; } .chat-header > div:first-child > div { min-width: 0; } .chat-header > div:first-child p { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; } .chat-main { padding-inline: 12px; } .chat-message-user { max-width: 92%; } .chat-composer-wrap { padding-inline: 12px; } .chat-composer-hint { display: none; } .chat-docs-link { display: none; } }
 
 .chat-composer {
   padding: 10px 12px;

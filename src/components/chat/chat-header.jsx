@@ -1,5 +1,6 @@
 
-import { History, Settings2 } from "lucide-react";
+import Link from "next/link";
+import { BookOpen, History, Settings2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import {
   Tooltip,
@@ -24,11 +25,21 @@ export function ChatHeader({ title, onOpenSettings, onOpenHistory }) {
         </div>
       </div>
 
-      <div className="flex items-center gap-1">
+      <div className="chat-header-actions flex items-center gap-1">
         <TooltipProvider delayDuration={250}>
           <Tooltip>
             <TooltipTrigger asChild>
-              <Button variant="ghost" size="icon" aria-label="باز کردن تاریخچه" onClick={onOpenHistory}>
+              <Button asChild variant="ghost" size="icon" className="chat-header-action chat-header-docs-action" aria-label="باز کردن مستندات اصلی">
+                <Link href="/documentation">
+                  <BookOpen aria-hidden="true" />
+                </Link>
+              </Button>
+            </TooltipTrigger>
+            <TooltipContent>مستندات اصلی</TooltipContent>
+          </Tooltip>
+          <Tooltip>
+            <TooltipTrigger asChild>
+              <Button variant="ghost" size="icon" className="chat-header-action" aria-label="باز کردن تاریخچه" onClick={onOpenHistory}>
                 <History size={19} aria-hidden="true" />
               </Button>
             </TooltipTrigger>
@@ -36,7 +47,7 @@ export function ChatHeader({ title, onOpenSettings, onOpenHistory }) {
           </Tooltip>
           <Tooltip>
             <TooltipTrigger asChild>
-              <Button variant="ghost" size="icon" aria-label="باز کردن تنظیمات" onClick={onOpenSettings}>
+              <Button variant="ghost" size="icon" className="chat-header-action" aria-label="باز کردن تنظیمات" onClick={onOpenSettings}>
                 <Settings2 size={19} aria-hidden="true" />
               </Button>
             </TooltipTrigger>
@@ -47,6 +58,4 @@ export function ChatHeader({ title, onOpenSettings, onOpenHistory }) {
     </header>
   );
 }
-
-
 
