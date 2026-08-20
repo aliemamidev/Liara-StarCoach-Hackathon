@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useState } from "react";
-import { playUiSound, syncSoundEnabled } from "@/lib/sound";
+import { bindUiSounds, playUiSound, syncSoundEnabled } from "@/lib/sound";
 
 const STORAGE_KEY = "liara-ui-sound-enabled";
 
@@ -11,6 +11,7 @@ export function useUiSound() {
     const next = stored !== "false";
     setEnabled(next);
     syncSoundEnabled(next);
+    bindUiSounds();
   }, []);
 
   const updateEnabled = useCallback((next) => {

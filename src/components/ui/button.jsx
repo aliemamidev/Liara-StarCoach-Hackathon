@@ -33,6 +33,8 @@ export const Button = React.forwardRef(
       <Comp
         className={cn(buttonVariants({ variant, size, className }))}
         ref={ref}
+        data-cuelume-press="press"
+        data-cuelume-release="release"
         {...props}
       />
     );
@@ -41,7 +43,6 @@ export const Button = React.forwardRef(
 Button.displayName = "Button";
 
 export { buttonVariants };
-
 
 
 

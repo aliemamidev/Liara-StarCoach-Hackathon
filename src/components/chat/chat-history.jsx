@@ -74,11 +74,11 @@ export function ChatHistory({ open, onOpenChange, history, activeChatId, onSelec
                 </div>
               ) : (
                 <>
-                  <button type="button" className="chat-history-title" onClick={() => startEditing(chat)} title="ویرایش نام گفتگو">
+                  <button type="button" className="chat-history-title" data-cuelume-press="press" data-cuelume-release="release" onClick={() => startEditing(chat)} title="ویرایش نام گفتگو">
                     <span className="truncate">{chat.title || "گفتگوی جدید"}</span>
                     <Pencil size={13} aria-hidden="true" />
                   </button>
-                  <button type="button" className="chat-history-open" onClick={() => onSelect(chat.id)}>
+                  <button type="button" className="chat-history-open" data-cuelume-press="press" data-cuelume-release="release" onClick={() => onSelect(chat.id)}>
                     <small><Clock3 size={12} aria-hidden="true" /> {formatDate(chat.updatedAt)}</small>
                   </button>
                   <Button type="button" variant="ghost" size="icon" className="h-8 w-8 shrink-0" onClick={() => onDelete(chat.id)} aria-label={`حذف ${chat.title}`}>
