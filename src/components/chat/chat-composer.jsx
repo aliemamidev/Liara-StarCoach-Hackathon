@@ -1,13 +1,8 @@
-import { ArrowUp, ImagePlus, LoaderCircle, Plus, Upload } from "lucide-react";
+import { ArrowUp, LoaderCircle, Plus } from "lucide-react";
 import { useEffect, useRef } from "react";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
-import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuTrigger,
-} from "@/components/ui/dropdown-menu";
+import { AttachmentList } from "@/components/ui/attachment";
 import {
   Tooltip,
   TooltipContent,
@@ -15,8 +10,9 @@ import {
   TooltipTrigger,
 } from "@/components/ui/tooltip";
 
-export function ChatComposer({ value, onChange, onSubmit, status, playSound }) {
+export function ChatComposer({ value, onChange, files, onFilesChange, onSubmit, status, playSound }) {
   const textareaRef = useRef(null);
+  const fileInputRef = useRef(null);
   const isBusy = status === "submitted" || status === "streaming";
 
   useEffect(() => {
@@ -34,14 +30,30 @@ export function ChatComposer({ value, onChange, onSubmit, status, playSound }) {
   }
 
   function submit() {
-    if (!value.trim() || isBusy) return;
+    if ((!value.trim() && !files.length) || isBusy) return;
     playSound("pulse");
     onSubmit();
+  }
+
+  function handleFiles(event) {
+    const selected = Array.from(event.target.files || []);
+    if (selected.length) onFilesChange([...files, ...selected]);
+    event.target.value = "";
   }
 
   return (
     <div className="chat-composer-wrap">
       <div className="chat-composer">
+        <input
+          ref={fileInputRef}
+          type="file"
+          className="sr-only"
+          multiple
+          accept="text/*,application/json,image/*,*/*"
+          onChange={handleFiles}
+          disabled={isBusy}
+        />
+        <AttachmentList files={files} onRemove={(index) => onFilesChange(files.filter((_, i) => i !== index))} />
         <Textarea
           ref={textareaRef}
           value={value}
@@ -54,37 +66,22 @@ export function ChatComposer({ value, onChange, onSubmit, status, playSound }) {
           disabled={isBusy}
         />
         <div className="flex items-center justify-between gap-2 pt-2">
-          <DropdownMenu dir="rtl">
-            <TooltipProvider delayDuration={250}>
-              <Tooltip>
-                <TooltipTrigger asChild>
-                  <DropdownMenuTrigger asChild>
-                    <Button variant="ghost" size="icon" aria-label="گزینه‌های افزودن">
-                      <Plus size={20} aria-hidden="true" />
-                    </Button>
-                  </DropdownMenuTrigger>
-                </TooltipTrigger>
-                <TooltipContent>گزینه‌های بیشتر</TooltipContent>
-              </Tooltip>
-            </TooltipProvider>
-            <DropdownMenuContent align="start">
-              <DropdownMenuItem disabled>
-                <Upload size={16} aria-hidden="true" /> افزودن فایل
-              </DropdownMenuItem>
-              <DropdownMenuItem disabled>
-                <ImagePlus size={16} aria-hidden="true" /> افزودن تصویر
-              </DropdownMenuItem>
-              <DropdownMenuItem disabled>
-                <Plus size={16} aria-hidden="true" /> گرفتن تصویر صفحه
-              </DropdownMenuItem>
-            </DropdownMenuContent>
-          </DropdownMenu>
+          <TooltipProvider delayDuration={250}>
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <Button type="button" variant="ghost" size="icon" aria-label="افزودن فایل" onClick={() => fileInputRef.current?.click()} disabled={isBusy}>
+                  <Plus size={20} aria-hidden="true" />
+                </Button>
+              </TooltipTrigger>
+              <TooltipContent>افزودن فایل</TooltipContent>
+            </Tooltip>
+          </TooltipProvider>
           <Button
             type="button"
             size="sm"
             className="min-w-24"
             onClick={submit}
-            disabled={!value.trim() || isBusy}
+            disabled={(!value.trim() && !files.length) || isBusy}
           >
             {isBusy ? <LoaderCircle className="animate-spin" size={16} /> : <ArrowUp size={16} />}
             <span>{isBusy ? "در حال دریافت" : "ارسال"}</span>

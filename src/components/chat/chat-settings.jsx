@@ -41,7 +41,7 @@ export function ChatSettings({ open, onOpenChange, soundEnabled, onSoundChange, 
 
   return (
     <Sheet open={open} onOpenChange={onOpenChange}>
-      <SheetContent side="right" dir="rtl">
+      <SheetContent side="left" dir="rtl">
         <SheetHeader>
           <SheetTitle>تنظیمات</SheetTitle>
           <SheetDescription>ظاهر و رفتار دستیار را تنظیم کنید.</SheetDescription>

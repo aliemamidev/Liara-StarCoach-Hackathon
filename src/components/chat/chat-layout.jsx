@@ -1,7 +1,8 @@
 import { useMemo, useState } from "react";
 import { DefaultChatTransport } from "ai";
 import { useChat } from "@ai-sdk/react";
-import { AlertCircle } from "lucide-react";
+import { AlertCircle, BookOpen } from "lucide-react";
+import Link from "next/link";
 import { Button } from "@/components/ui/button";
 import { ChatHeader } from "@/components/chat/chat-header";
 import { ChatEmptyState } from "@/components/chat/chat-empty-state";
@@ -12,6 +13,7 @@ import { useUiSound } from "@/hooks/use-ui-sound";
 
 export function ChatLayout() {
   const [input, setInput] = useState("");
+  const [files, setFiles] = useState([]);
   const [settingsOpen, setSettingsOpen] = useState(false);
   const sound = useUiSound();
   const transport = useMemo(() => new DefaultChatTransport({ api: "/api/chat" }), []);
@@ -19,9 +21,10 @@ export function ChatLayout() {
 
   function submitMessage(value = input) {
     const trimmed = value.trim();
-    if (!trimmed || status === "submitted" || status === "streaming") return;
-    sendMessage({ text: trimmed });
+    if ((!trimmed && !files.length) || status === "submitted" || status === "streaming") return;
+    sendMessage({ text: trimmed, files });
     setInput("");
+    setFiles([]);
   }
 
   function retry() {
@@ -54,10 +57,16 @@ export function ChatLayout() {
       <ChatComposer
         value={input}
         onChange={setInput}
+        files={files}
+        onFilesChange={setFiles}
         onSubmit={() => submitMessage()}
         status={status}
         playSound={sound.playSound}
       />
+      <Link href="/documentation" className="chat-docs-link">
+        <BookOpen size={17} aria-hidden="true" />
+        <span>مستندات اصلی</span>
+      </Link>
       <ChatSettings
         open={settingsOpen}
         onOpenChange={setSettingsOpen}
