@@ -1,25 +1,23 @@
-# 1) Build
 FROM docker-mirror.liara.ir/node:18-alpine AS builder
-
-ARG MY_BASE_URL
-ARG MY_API_KEY
-
-ENV MY_BASE_URL=$MY_BASE_URL
-ENV MY_API_KEY=$MY_API_KEY
 
 WORKDIR /app
 
-COPY package*.json /app/
+COPY package*.json ./
+RUN npm ci
 
-# RUN npm i --registry=https://mirror-npm.runflare.com
-RUN npm i 
-
-COPY . /app/
-
+COPY . ./
 RUN npm run build
 
-# 2) Run
-FROM registry2.iran.liara.ir/platforms/static-platform:base
+FROM docker-mirror.liara.ir/node:18-alpine AS runner
 
-COPY liara_nginx.conf /etc/nginx/conf.d
-COPY --from=builder /app/out /usr/share/nginx/html
+WORKDIR /app
+ENV NODE_ENV=production
+
+COPY --from=builder /app/package*.json ./
+COPY --from=builder /app/node_modules ./node_modules
+COPY --from=builder /app/.next ./.next
+COPY --from=builder /app/public ./public
+COPY --from=builder /app/next.config.mjs ./next.config.mjs
+
+EXPOSE 3000
+CMD ["npm", "run", "start"]

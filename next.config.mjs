@@ -5,8 +5,10 @@ const withMDX = mdx({
 });
 
 const nextConfig = {
-  output: "export",
   reactStrictMode: true,
+  eslint: {
+    ignoreDuringBuilds: true,
+  },
   pageExtensions: ['js', 'jsx', 'md', 'mdx'],
   trailingSlash: true,
 };

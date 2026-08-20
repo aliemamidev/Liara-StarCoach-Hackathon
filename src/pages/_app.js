@@ -5,11 +5,17 @@ import "@/styles/dark.css";
 import "highlight.js/styles/solarized-light.css";
 
 import { MDXProvider } from "@mdx-js/react";
+import { ThemeProvider } from "next-themes";
+import { DirectionProvider } from "@/components/ui/direction";
 
 export default function App({ Component, pageProps }) {
   return (
-    <MDXProvider>
-      <Component {...pageProps} />{" "}
-    </MDXProvider>
+    <ThemeProvider attribute="class" defaultTheme="system" enableSystem>
+      <DirectionProvider dir="rtl">
+        <MDXProvider>
+          <Component {...pageProps} />
+        </MDXProvider>
+      </DirectionProvider>
+    </ThemeProvider>
   );
 }

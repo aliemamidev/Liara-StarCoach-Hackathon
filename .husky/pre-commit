@@ -1,6 +1,13 @@
 #!/usr/bin/env sh
 echo "Checking for MDX changes in staging area..."
 
+# The converter is optional in this checkout. Do not block commits when the
+# separate converter package has not been cloned or installed.
+if [ ! -f "mdx-to-md-converter/package.json" ]; then
+  echo "MDX converter not found; skipping MDX conversion checks."
+  exit 0
+fi
+
 STAGED_MDX_MODIFIED=$(git diff --cached --name-only --diff-filter=AM -- ":(glob)src/pages/**/*.mdx" || true)
 STAGED_MDX_DELETED=$(git diff --cached --name-only --diff-filter=D -- ":(glob)src/pages/**/*.mdx" || true)
 

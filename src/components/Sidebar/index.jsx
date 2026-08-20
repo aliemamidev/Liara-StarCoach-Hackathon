@@ -75,7 +75,7 @@ const Sidebar = ({ setShowSidebar, showSidebar }) => {
             !isVisible ? " opacity-50" : " opacity-100"
           } `}
         >
-          <Link href="/" className="flex mb-3 items-center gap-2 font-semibold">
+          <Link href="/documentation" className="flex mb-3 items-center gap-2 font-semibold">
             <img src={"/static/logo.svg"} width="60" />
 
             <span className="text-[11px] px-1 py-0 font-medium text-[#fff] bg-[#333] rounded">
@@ -97,10 +97,11 @@ const Sidebar = ({ setShowSidebar, showSidebar }) => {
                     );
                   }
 
-                  const isActive = router.pathname === item.link;
+                  const itemLink = item.link === "/" ? "/documentation" : item.link;
+                  const isActive = router.pathname === itemLink;
 
                   return (
-                    <Link href={item.link}>
+                    <Link href={itemLink}>
                       <li
                         className={`flex mt-3  pr-2 items-center gap-3 ${
                           isActive &&

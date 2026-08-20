@@ -17,6 +17,7 @@ const Layout = ({ children }) => {
           <div className="w-[100%] px-4 mt-[80px] md:px-0 overflow-x-hidden md:w-[1350px] layout md:pr-[300px] md:mt-[100px] md:mx-auto pb-10">
             {router.pathname !== "/404" &&
               router.pathname !== "/" &&
+              router.pathname !== "/documentation" &&
               router.pathname !== "/tv" && (
                 <div className="flex justify-end md:mb-[-60px]">
                   <PageActionButtons />
