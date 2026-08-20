@@ -5,6 +5,7 @@ export const LIA_STAGES = Object.freeze({
   CLARIFICATION: "clarification",
   SCREENSHOT: "screenshot",
   PROBABLE: "probable",
+  OUT_OF_SCOPE: "out_of_scope",
 });
 
 const QUERY_TOKEN_PATTERN = /[\p{L}\p{N}]+/gu;
@@ -25,6 +26,8 @@ export const SCREENSHOT_MESSAGE = `## درخواست Screenshot
 export const DOCUMENTATION_UNAVAILABLE_MESSAGE = `## پاسخ
 
 در حال حاضر خواندن Documentation داخلی لیارا در دسترس نیست؛ بنابراین برای جلوگیری از ارائهٔ اطلاعات نادرست، پاسخ قطعی نمی‌دهم. لطفاً کمی بعد دوباره تلاش کنید.`;
+
+export const OUT_OF_SCOPE_MESSAGE = "من توانایی پاسخ به این سوال را ندارم.";
 
 export const PROBABLE_FALLBACK_NOTICE = `## پاسخ احتمالی و غیرمستند
 
@@ -95,6 +98,12 @@ function hasImageAttachment(messages) {
   return (latestUserMessage?.parts || []).some((part) => part?.type === "file" && String(part.mediaType || "").startsWith("image/"));
 }
 
+const IN_SCOPE_PATTERN = /(?:هوش مصنوعی|یادگیری ماشین|یادگیری ماشینی|مدل زبان|چت‌?بات|الگوریتم|پرامپت|توکن|پردازش متن|تکنولوژی|فناوری|کامپیوتر|رایانه|برنامه‌نویسی|برنامه نویسی|کدنویسی|کد|پایتون|جاوااسکریپت|تایپ‌?اسکریپت|جاوا|php|node(?:\.js)?|react|next(?:\.js)?|vue|sql|api|sdk|http|سرور|کلود|ابری|دیتابیس|پایگاه داده|داده|شبکه|امنیت|رمزنگاری|لینوکس|ویندوز|گیت|docker|کانتینر|استقرار|دیپلوی|deploy|دامنه|dns|وب‌?سایت|سایت|اپلیکیشن|نرم‌افزار|نرم افزار|لینک|فایل|خطا|ارور|لاگ|پایگاه دانش|مستندات|documentation|لیارا|liara|پنل|حساب کاربری|سرویس|صورتحساب|فاکتور|ذخیره‌?سازی|پشتیبان|بکاپ|redis|mysql|mongodb|postgres|آی‌?پی|پورت|ssl|tls|ssh|cors|cdn|github|gitlab|اسکرین‌?شات|screenshot)/iu;
+
+export function isLikelyInScope(query) {
+  return IN_SCOPE_PATTERN.test(normalizeText(query));
+}
+
 function hasInsufficientDescription(query) {
   const queryTokens = [...new Set(tokens(query))];
   return queryTokens.length < 3 || /^(کمک|مشکل دارم|کار نمی‌کند|کار نمیکند|خطا|ارور|درست نیست|نمی‌شود|نمیشه|help|error)$/i.test(normalizeText(query));
@@ -107,6 +116,10 @@ function shouldSearchOnline(hits, query) {
 export async function createLiaControllerPlan(messages) {
   const query = latestUserText(messages);
   const priorStage = previousStage(messages);
+
+  if (!isLikelyInScope(query)) {
+    return { mode: LIA_STAGES.OUT_OF_SCOPE, stage: LIA_STAGES.OUT_OF_SCOPE, query, hits: [] };
+  }
 
   if (hasImageAttachment(messages)) {
     return { mode: LIA_STAGES.PROBABLE, stage: LIA_STAGES.PROBABLE, query, hits: [] };
