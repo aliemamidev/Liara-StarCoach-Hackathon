@@ -12,16 +12,20 @@ const QUERY_TOKEN_PATTERN = /[\p{L}\p{N}]+/gu;
 
 export const CLARIFICATION_MESSAGE = `## پرسش تکمیلی
 
-برای اینکه بهتر راهنمایی‌تان کنم، مشکل دقیقاً در کدام بخش یا صفحه دیده می‌شود؟`;
+برای تشخیص دقیق‌تر، لطفاً کوتاه بگویید:
+
+1. مشکل در کدام صفحه، بخش یا محیط رخ می‌دهد؟
+2. متن دقیق خطا یا پیام نمایش‌داده‌شده چیست؟
+3. انتظار داشتید چه اتفاقی بیفتد و در عمل چه اتفاقی افتاد؟`;
 
 export const SCREENSHOT_MESSAGE = `## درخواست Screenshot
 
-اگر توضیح مشکل سخت است، اشکالی ندارد. با دیدن تصویر صفحه می‌توانم مشکل را دقیق‌تر بررسی کنم:
+برای اینکه بتوانم مشکل را دقیق‌تر بررسی کنم، لطفاً یک Screenshot ارسال کنید. بهتر است تصویر شامل صفحه‌ای باشد که مشکل در آن رخ می‌دهد، متن کامل خطا یا پیام، و بخش تنظیمات یا پنلی باشد که به مشکل مربوط است. اگر مشکل چند مرحله دارد، از مراحل مهم هم تصویر بفرستید.
 
-1. از صفحه‌ای که مشکل را در آن می‌بینید Screenshot بگیرید.
-2. در همین چت، از منوی «افزودن» گزینهٔ «Screenshot» را انتخاب کنید؛ یا تصویر را با گزینهٔ «افزودن فایل» پیوست و ارسال کنید.
+1. از صفحهٔ مرتبط Screenshot بگیرید.
+2. در همین چت، از منوی «افزودن» گزینهٔ «Screenshot» را انتخاب کنید؛ یا تصویر را با گزینهٔ «افزودن فایل» پیوست کنید.
 
-اگر داخل تصویر رمز عبور، شماره کارت، توکن، API Key یا اطلاعات محرمانه‌ای هست، قبل از ارسال آن بخش را مخفی کنید.`;
+قبل از ارسال، رمز عبور، کلید API، توکن، اطلاعات شخصی یا هر دادهٔ محرمانه را مخفی کنید. اگر امکان ارسال تصویر ندارید، متن کامل خطا، مراحل انجام کار و سیستم‌عامل/مرورگر/ابزار و نسخهٔ آن را بنویسید.`;
 
 export const DOCUMENTATION_UNAVAILABLE_MESSAGE = `## پاسخ
 
@@ -109,6 +113,15 @@ function hasInsufficientDescription(query) {
   return queryTokens.length < 3 || /^(کمک|مشکل دارم|کار نمی‌کند|کار نمیکند|خطا|ارور|درست نیست|نمی‌شود|نمیشه|help|error)$/i.test(normalizeText(query));
 }
 
+const VISUAL_DIAGNOSTIC_PATTERN = /(?:خطا|ارور|کار نمی‌کند|کار نمیکند|درست اجرا نمی‌شود|درست اجرا نمیشود|باگ|رفتار غیرمنتظره|نمایش داده نمی‌شود|نمایش داده نمیشود|ظاهر خراب|صفحه سفید|صفحه سیاه|پیام خطا|اسکرین‌?شات|screenshot|error|bug|not working|unexpected)/iu;
+const VISUAL_CONTEXT_PATTERN = /(?:صفحه|پنل|تنظیمات|رابط کاربری|ظاهر|نمایش)/iu;
+
+function needsVisualDiagnosis(query) {
+  const normalizedQuery = normalizeText(query);
+  return VISUAL_DIAGNOSTIC_PATTERN.test(normalizedQuery)
+    || (/(?:مشکل|درست نیست|نمی‌شود|نمیشه|خراب)/iu.test(normalizedQuery) && VISUAL_CONTEXT_PATTERN.test(normalizedQuery));
+}
+
 function shouldSearchOnline(hits, query) {
   return !isStrongEvidence(hits, query);
 }
@@ -125,7 +138,7 @@ export async function createLiaControllerPlan(messages) {
     return { mode: LIA_STAGES.PROBABLE, stage: LIA_STAGES.PROBABLE, query, hits: [] };
   }
 
-  if (hasInsufficientDescription(query)) {
+  if (hasInsufficientDescription(query) || needsVisualDiagnosis(query)) {
     const stage = priorStage === LIA_STAGES.CLARIFICATION
       ? LIA_STAGES.SCREENSHOT
       : LIA_STAGES.CLARIFICATION;
