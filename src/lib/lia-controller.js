@@ -69,7 +69,7 @@ export function latestUserText(messages) {
 }
 
 function hitCoverage(hit, queryTokens) {
-  const haystack = new Set(tokens(`${hit.title || ""} ${hit.body || ""}`));
+  const haystack = new Set(tokens(`${hit.title || ""} ${hit.section || ""} ${hit.path || ""} ${hit.body || ""}`));
   return queryTokens.filter((token) => haystack.has(token)).length;
 }
 
@@ -78,7 +78,7 @@ function scoreHit(hit, queryTokens) {
 }
 
 function isStrongEvidence(hits, query) {
-  const queryTokens = [...new Set(tokens(query))];
+  const queryTokens = [...new Set(tokens(query).filter((token) => !QUERY_NOISE_WORDS.has(token) || TECHNICAL_ENTITY_PATTERN.test(token)))];
   if (!queryTokens.length) return false;
   const requiredCoverage = queryTokens.length <= 2
     ? 1
@@ -120,9 +120,9 @@ function retrievalText(messages, latestQuery) {
     .filter((message) => message.role === "user")
     .map((message) => latestUserText([message]))
     .filter(Boolean);
-  const recent = userTexts.slice(-3);
-  if (!recent.includes(latestQuery)) recent.push(latestQuery);
-  return recent.join(" ").trim().slice(0, 6000);
+  const prior = userTexts.slice(0, -1).slice(-2);
+  if (!prior.length || !shouldUseConversationContext(latestQuery)) return latestQuery.trim().slice(0, 6000);
+  return [...prior, latestQuery].join(" ").trim().slice(0, 6000);
 }
 
 export function isGreeting(query) {
@@ -136,10 +136,14 @@ function hasImageAttachment(messages) {
 
 const IN_SCOPE_PATTERN = /(?:هوش مصنوعی|یادگیری ماشین|یادگیری ماشینی|مدل زبان|چت‌?بات|الگوریتم|پرامپت|توکن|پردازش متن|تکنولوژی|فناوری|کامپیوتر|رایانه|برنامه‌نویسی|برنامه نویسی|کدنویسی|کد|پایتون|جاوااسکریپت|تایپ‌?اسکریپت|جاوا|php|node(?:\.js)?|react|next(?:\.js)?|vue|sql|api|sdk|http|سرور|کلود|ابری|دیتابیس|پایگاه داده|داده|شبکه|امنیت|رمزنگاری|لینوکس|ویندوز|گیت|docker|کانتینر|استقرار|دیپلوی|deploy|دامنه|dns|وب‌?سایت|سایت|اپلیکیشن|نرم‌افزار|نرم افزار|لینک|فایل|خطا|ارور|لاگ|پایگاه دانش|مستندات|documentation|لیارا|liara|پنل|حساب کاربری|سرویس|صورتحساب|فاکتور|ذخیره‌?سازی|پشتیبان|بکاپ|redis|mysql|mongodb|postgres|آی‌?پی|پورت|ssl|tls|ssh|cors|cdn|github|gitlab|اسکرین‌?شات|screenshot)/iu;
 const TECHNICAL_SYMPTOM_PATTERN = /(?:برنامه\s*(?:م|ام|من)|اپلیکیشن\s*(?:م|ام|من)|سایت\s*(?:م|ام|من)|کار نمی\s*(?:کند|کنه)|درست نیست|خراب شده|مشکل دارم|خطا دارم|ارور دارم|صفحه\s+(?:سفید|سیاه)|اسکرین\s*شات)/iu;
+const TECHNICAL_ENTITY_PATTERN = /(?:api|api\s*key|cli|sdk|http|graphql|docker|redis|mysql|mongodb|postgres(?:ql)?|ssh|node(?:\.js)?|python|php|react|next(?:\.js)?|dns|ssl|tls|cors|cdn|github|gitlab|دیتابیس|پایگاه داده|استقرار|دیپلوی|deploy|دامنه|سرور|لیارا|liara)/iu;
+const QUERY_NOISE_WORDS = new Set(["چطور", "چطوری", "چگونه", "نحوه", "میخوام", "می", "خوام", "بگیرم", "گرفتن", "دریافت", "استفاده", "کنم", "کنیم", "میشه", "شود", "کنه"]);
+const QUERY_ACTION_PATTERN = /(?:چطور|چطوری|چگونه|نحوه|میخوام|می\s+خوام|بگیرم|گرفتن|دریافت|استفاده|ساخت|ایجاد|مستندات|راهنما|چیست|معرفی)/iu;
+const QUERY_CONTEXT_REFERENCE_PATTERN = /(?:این|همین|آن|اون|همان|ادامه|قبلی|بالا|این مورد|همین مورد|چطورش|پس)/iu;
 
 const GENERAL_TECHNICAL_EXPLANATION_PATTERN = /(?:چیست|چیستند|یعنی چه|چه تفاوتی|تفاوت|تعریف|معنی|چگونه کار می\s*کند|چطور کار می\s*کند|چطور(?:\s+\S+){0,8}\s*(?:ایجاد|بساز|ساخت)\s*(?:کنم|کنیم)?|چگونه(?:\s+\S+){0,8}\s*(?:ایجاد|بساز|ساخت)\s*(?:کنم|کنیم)?|توضیح بده|معرفی کن|what is|what are|difference between|how does .* work)/iu;
 const LIARA_SPECIFIC_PATTERN = /(?:لیارا|liara|پنل|قیمت|پلن|صورتحساب|فاکتور|سرویس لیارا|مستندات لیارا|حساب کاربری|دامنه\s*من|دامنه\s*ام|اپلیکیشن\s*من|برنامه\s*ام|در لیارا|روی لیارا)/iu;
-const LIARA_DOCUMENTED_TECHNOLOGY_PATTERN = /(?:postgres(?:ql)?|mysql|mongodb|redis|rabbitmq|prisma|sql|dbaas|paas|iaas|node(?:\.js)?|next(?:\.js)?|nest(?:\.js)?|nestjs|react|docker|python|php|github|gitlab|dns|ssl|tls|cors|websocket|cron|متغیر\s+محیطی|environment\s+variable|vercel\s+ai|ai\s+sdk|هوش\s+مصنوعی|چت‌?بات)/iu;
+const LIARA_DOCUMENTED_TECHNOLOGY_PATTERN = /(?:api|cli|postgres(?:ql)?|mysql|mongodb|redis|rabbitmq|prisma|sql|dbaas|paas|iaas|node(?:\.js)?|next(?:\.js)?|nest(?:\.js)?|nestjs|react|docker|python|php|github|gitlab|dns|ssl|tls|cors|websocket|cron|متغیر\s+محیطی|environment\s+variable|vercel\s+ai|ai\s+sdk|هوش\s+مصنوعی|چت‌?بات)/iu;
 export function isLikelyInScope(query) {
   const normalizedQuery = normalizeText(query);
   return IN_SCOPE_PATTERN.test(normalizedQuery) || TECHNICAL_SYMPTOM_PATTERN.test(normalizedQuery);
@@ -166,13 +170,19 @@ function shouldSearchOnline(hits, query) {
   return !isStrongEvidence(hits, query);
 }
 
+function shouldUseConversationContext(query) {
+  const normalized = normalizeText(query);
+  return tokens(normalized).length <= 2 || QUERY_CONTEXT_REFERENCE_PATTERN.test(normalized) || !TECHNICAL_ENTITY_PATTERN.test(normalized);
+}
+
 function detectedService(query) {
-  return /(?:لیارا|liara|paas|dbaas|iaas|ai|dns|email|mail|object\s*storage|ذخیره‌?سازی|دیتابیس|پایگاه\s+داده|postgres(?:ql)?|mysql|mongodb|redis|node(?:\.js)?|python|php|docker|دامنه|پنل|اپلیکیشن|سرویس)/iu.test(query);
+  return TECHNICAL_ENTITY_PATTERN.test(query) || /(?:لیارا|liara|paas|dbaas|iaas|ai|dns|email|mail|object\s*storage|ذخیره‌?سازی|پایگاه\s+داده|دامنه|پنل|اپلیکیشن|سرویس)/iu.test(query);
 }
 
 function hasGoal(query) {
   const normalized = normalizeText(query);
   if (GENERAL_TECHNICAL_EXPLANATION_PATTERN.test(normalized) && tokens(normalized).length >= 2) return true;
+  if (TECHNICAL_ENTITY_PATTERN.test(normalized) && (tokens(normalized).length <= 3 || QUERY_ACTION_PATTERN.test(normalized))) return true;
   return tokens(normalized).length >= 4 && !/^(?:کمک|مشکل دارم|خطا|ارور|help|error)$/iu.test(normalized);
 }
 
@@ -199,10 +209,10 @@ function buildClarification(query) {
   return `${CLARIFICATION_MESSAGE}\n\n${questions.map((question, index) => `${index + 1}. ${question}`).join("\n")}`;
 }
 
-function understandingComplete(query, conversation) {
-  const combined = normalizeText(`${conversation} ${query}`);
-  const diagnostic = needsVisualDiagnosis(combined) || hasErrorDescription(combined);
-  return detectedService(combined) && hasGoal(combined) && (!diagnostic || (hasErrorDescription(combined) && hasEnvironment(combined)));
+function understandingComplete(query) {
+  const normalizedQuery = normalizeText(query);
+  const diagnostic = needsVisualDiagnosis(normalizedQuery) || hasErrorDescription(normalizedQuery);
+  return detectedService(normalizedQuery) && hasGoal(normalizedQuery) && (!diagnostic || (hasErrorDescription(normalizedQuery) && hasEnvironment(normalizedQuery)));
 }
 
 export async function createLiaControllerPlan(messages, settings = {}) {
@@ -216,7 +226,7 @@ export async function createLiaControllerPlan(messages, settings = {}) {
   const priorStage = previousStage(messages);
   const conversation = allUserText(messages);
   const retrievalQuery = retrievalText(messages, query);
-  const contextQuery = normalizeText(`${conversation} ${query}`);
+  const contextQuery = retrievalText(messages, query);
 
   if (isGreeting(query)) {
     return { mode: LIA_STAGES.ANSWER, stage: LIA_STAGES.ANSWER, query, hits: [], brainHits: [], searchTrace: ["greeting"], metadata: { staticAnswer: GREETING_MESSAGE } };
@@ -228,7 +238,7 @@ export async function createLiaControllerPlan(messages, settings = {}) {
 
   const generalTechnical = isGeneralTechnicalQuery(contextQuery);
   const hasImage = hasImageAttachment(messages);
-  if (!understandingComplete(query, conversation) && !generalTechnical) {
+  if (!understandingComplete(contextQuery) && !generalTechnical) {
     const visualRequired = needsVisualDiagnosis(`${conversation} ${query}`) && !hasImage;
     if (visualRequired && priorStage !== LIA_STAGES.SCREENSHOT) {
       return {
@@ -319,7 +329,7 @@ export async function createLiaControllerPlan(messages, settings = {}) {
 }
 
 const INTERNAL_OUTPUT_PATTERN = /system prompt|developer message|internal reasoning|زنجیرهٔ فکر|تحلیل داخلی|پرامپت\s*سیستم|قوانین\s*داخلی|دستورهای\s*داخلی|افشای\s+دستور/i;
-const SECRET_OUTPUT_PATTERN = /(?:api[_ -]?key|token|secret|password|رمز(?:\s*عبور)?|کلید(?:\s+خصوصی)?|پسورد)\s*[:=]\s*[^\s`,'")]+|\b(?:bearer|basic)\s+[A-Za-z0-9._~+/=-]{12,}|(?:postgres(?:ql)?|mysql|mongodb|redis):\/\/[^\s`'"<>]+|-----BEGIN [^-]+ PRIVATE KEY-----/iu;
+const SECRET_OUTPUT_PATTERN = /(?:api[_-]?key|token|secret|password|رمز(?:\s*عبور)?|کلید(?:\s+خصوصی)?|پسورد)\s*[:=]\s*(?:["'`][^"'`\r\n]{8,}["'`]|(?=[A-Za-z0-9._~+/=-]{20,}(?:\s|$))(?=[A-Za-z0-9._~+/=-]*\d)[A-Za-z0-9._~+/=-]{20,})|\b(?:bearer|basic)\s+(?=[A-Za-z0-9._~+/=-]{20,}(?:\s|$))(?=[A-Za-z0-9._~+/=-]*\d)[A-Za-z0-9._~+/=-]{20,}|(?:postgres(?:ql)?|mysql|mongodb|redis):\/\/[^\s`'"<>]+|-----BEGIN [^-]+ PRIVATE KEY-----/iu;
 const DANGEROUS_COMMAND_PATTERN = /(?:\brm\s+-rf\b|docker\s+system\s+prune(?:\s+-a)?|\b(?:drop|truncate)\s+(?:database|table|schema|index)\b|\bdelete\s+from\b|git\s+push\s+--force(?:-with-lease)?|kubectl\s+delete\s+.*--all|(?:liara|aws|gcloud)\s+.*\b(?:delete|destroy|terminate)\b)/iu;
 
 export function isUnsafeLiaDraft(text) {
@@ -331,7 +341,9 @@ export function validateLiaDraft(text) {
   const value = String(text || "").trim();
   if (!value || value.length > 12000) return false;
   if (!/^##\s*پاسخ(?:\s|$)/u.test(value)) return false;
-  if (/##\s*منبع پاسخ|<documentation-source|https?:\/\//i.test(value)) return false;
+  const prose = value.replace(/```[\s\S]*?```/g, "");
+  if (/##\s*منبع پاسخ|<documentation-source|https?:\/\/|www\./i.test(prose)) return false;
+  if (/\[[^\]]+\]\((?:https?:\/\/|\/)/i.test(prose)) return false;
   if (isUnsafeLiaDraft(value)) return false;
   return true;
 }

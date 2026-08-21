@@ -122,6 +122,9 @@ model KnowledgeDocument {
   title       String
   url         String?
   imageUrl    String?
+  category    String?
+  service     String?
+  documentType String?
   rawContent  String            @db.Text
   contentHash String
   isActive    Boolean           @default(true)
@@ -131,6 +134,7 @@ model KnowledgeDocument {
 
   @@index([isActive])
   @@index([title])
+  @@index([category, service])
 }
 
 model KnowledgeChunk {

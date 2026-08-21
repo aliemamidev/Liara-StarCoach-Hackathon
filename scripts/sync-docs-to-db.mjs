@@ -11,6 +11,9 @@ for (const chunk of documents) {
     title: chunk.title,
     url: chunk.url,
     imageUrl: chunk.imageUrl,
+    category: chunk.category,
+    service: chunk.service,
+    documentType: chunk.documentType,
     rawContent: chunk.rawContent || chunk.body,
     chunks: [],
   };
@@ -28,6 +31,9 @@ await prisma.$transaction(async (transaction) => {
         title: document.title,
         url: document.url,
         imageUrl: document.imageUrl,
+        category: document.category,
+        service: document.service,
+        documentType: document.documentType,
         rawContent,
         contentHash: createHash("sha256").update(rawContent).digest("hex"),
         isActive: true,
@@ -37,6 +43,9 @@ await prisma.$transaction(async (transaction) => {
         title: document.title,
         url: document.url,
         imageUrl: document.imageUrl,
+        category: document.category,
+        service: document.service,
+        documentType: document.documentType,
         rawContent,
         contentHash: createHash("sha256").update(rawContent).digest("hex"),
         isActive: true,
@@ -54,7 +63,7 @@ await prisma.$transaction(async (transaction) => {
       })),
     });
   }
-});
+}, { timeout: 120000 });
 
 console.log(`Synchronized ${grouped.size} documents and ${documents.length} searchable chunks.`);
 await prisma.$disconnect();

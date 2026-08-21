@@ -36,7 +36,9 @@ function pipeStaticMessage(response, messages, message, stage, metadata = {}) {
 }
 
 function sourceMetadata(plan) {
-  const documentationSources = (plan.hits || []).map(toPublicDocumentationHit).filter(Boolean).slice(0, 4);
+  const documentationSources = [...new Map(
+    (plan.hits || []).map(toPublicDocumentationHit).filter(Boolean).map((source) => [source.url, source]),
+  ).values()].slice(0, 4);
   const knowledgeSources = (plan.brainHits || []).slice(0, 2).map((entry) => ({
     title: entry.question,
     url: entry.sourceRefs?.find?.((source) => source?.url)?.url || "/documentation",

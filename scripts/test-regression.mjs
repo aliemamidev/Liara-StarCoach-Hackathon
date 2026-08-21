@@ -38,14 +38,14 @@ async function waitForServer() {
   throw new Error("regression server did not start");
 }
 
-async function postChat(text, parts = [{ type: "text", text }]) {
+async function postMessages(messages) {
   const chatId = `regression-${randomUUID()}`;
   let cookie = "";
   try {
     const response = await fetch(`${baseUrl}/api/chat/`, {
       method: "POST",
       headers: { "content-type": "application/json" },
-      body: JSON.stringify({ chatId, messages: [{ role: "user", parts }] }),
+      body: JSON.stringify({ chatId, messages }),
     });
     cookie = response.headers.get("set-cookie")?.split(";")[0] || "";
     return { status: response.status, body: await response.text() };
@@ -56,6 +56,10 @@ async function postChat(text, parts = [{ type: "text", text }]) {
       body: JSON.stringify({ id: chatId }),
     }).catch(() => {});
   }
+}
+
+async function postChat(text, parts = [{ type: "text", text }]) {
+  return postMessages([{ role: "user", parts }]);
 }
 
 test.before(async () => {
@@ -136,6 +140,45 @@ test("local docs search returns more than one precise source when needed", async
   assert.ok(hits.length > 1);
   assert.equal(new Set(hits.map((hit) => hit.url)).size, hits.length);
   assert.ok(hits.every((hit) => /^https:\/\/docs\.liara\.ir\//.test(hit.url)));
+});
+
+test("API intent matrix stays grounded on the API reference", async () => {
+  const queries = [
+    "api",
+    "Liara API",
+    "API لیارا",
+    "چطوری api بگیرم؟",
+    "میخوام api بگیرم",
+    "دریافت api",
+    "سرویس api",
+    "مستندات API لیارا",
+    "نحوه استفاده از API لیارا",
+  ];
+  for (const query of queries) {
+    const response = await fetch(`${baseUrl}/api/docs-search/?q=${encodeURIComponent(query)}`);
+    assert.equal(response.status, 200, query);
+    const hits = (await response.json()).hits || [];
+    assert.ok(hits.length > 0, query);
+    assert.equal(hits[0].path, "public/llms/references/api/about.md", query);
+    assert.ok(hits[0].category && hits[0].service && hits[0].documentType, query);
+  }
+  const chat = await postChat("سرویس api");
+  assert.equal(chat.status, 200);
+  assert.match(chat.body, /"liaStage":"answer"/);
+  assert.match(chat.body, /references\/api\/about/);
+  assert.doesNotMatch(chat.body, /پرسش تکمیلی|دستورهای مخرب|ارسال برای بررسی/);
+});
+
+test("follow-up context is used only when the new question needs it", async () => {
+  const conversation = await postMessages([
+    { role: "user", parts: [{ type: "text", text: "Liara API" }] },
+    { role: "assistant", metadata: { liaStage: "answer" }, parts: [{ type: "text", text: "پاسخ قبلی درباره API" }] },
+    { role: "user", parts: [{ type: "text", text: "چطور کلیدش را بسازم؟" }] },
+  ]);
+  assert.equal(conversation.status, 200);
+  assert.match(conversation.body, /"liaStage":"answer"/);
+  assert.match(conversation.body, /references\/api\/about/);
+  assert.doesNotMatch(conversation.body, /پرسش تکمیلی|ارسال برای بررسی/);
 });
 
 test("context redacts secrets and citations reject fabricated URLs", () => {

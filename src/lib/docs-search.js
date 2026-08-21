@@ -11,6 +11,7 @@ const DOCUMENTATION_ROOTS = ["public/llms"];
 const ONLINE_INDEX = "docs";
 const DATABASE_QUERY_PATTERN = /(?:دیتابیس|پایگاه\s+داده|database|postgres(?:ql)?|mysql|mariadb|mongodb|mongo|redis|rabbitmq|elasticsearch|elastic\s*search|mssql|sql\s*server|sqlite|بکاپ|backup|بازیابی|restore|connection\s*pool|اتصال\s+به\s+(?:دیتابیس|پایگاه))/iu;
 const SEARCH_STOP_WORDS = new Set(["به", "در", "برای", "با", "از", "و", "را", "یک", "این", "آن", "برنامه", "روش", "است", "های", "کردن"]);
+const QUERY_NOISE_WORDS = new Set(["چطور", "چطوری", "چگونه", "نحوه", "میخوام", "می", "خوام", "بگیرم", "گرفتن", "دریافت", "استفاده", "کنم", "کنیم", "میشه", "شود", "کنه"]);
 const DOCUMENTATION_HOST_PATTERN = /(?:^|\.)liara\.ir$/i;
 let documentsPromise;
 let onlineClient;
@@ -39,6 +40,10 @@ function tokens(value) {
 const QUERY_SYNONYMS = [
   [/\bdeploy(?:ment)?\b|استقرار|دیپلوی/iu, "deploy deployment استقرار دیپلوی"],
   [/\bnode(?:\.js)?\b|نود/iu, "node nodejs node.js نود"],
+  [/\bapi\b|\bapi key\b|کلید\s+(?:دسترسی|api)/iu, "api api-key http endpoint token کلید دسترسی"],
+  [/\bcli\b|خط\s*فرمان/iu, "cli command line خط فرمان"],
+  [/\bdocker\b|داکر/iu, "docker container کانتینر داکر"],
+  [/\bssh\b/iu, "ssh سرور دسترسی"],
   [/\bplan\b|پلن|قیمت/iu, "plan pricing price پلن قیمت"],
   [/database|postgres(?:ql)?|mysql|mongodb|redis|دیتابیس|پایگاه\s+داده/iu, "database دیتابیس پایگاه داده postgres postgresql mysql mongodb redis"],
   [/error|خطا|ارور|exception|مشکل/iu, "error خطا ارور exception مشکل"],
@@ -48,6 +53,10 @@ const QUERY_SYNONYMS = [
 function tokenVariants(token) {
   const match = QUERY_SYNONYMS.find(([pattern, value]) => pattern.test(token));
   return match ? tokens(match[1]) : [token];
+}
+
+function queryTokens(value) {
+  return [...new Set(tokens(value).filter((token) => !QUERY_NOISE_WORDS.has(token) || TECHNICAL_TERM_PATTERN.test(token)))];
 }
 
 function matchesToken(token, values) {
@@ -93,6 +102,17 @@ function imageUrlFrom(content) {
   const image = String(content || "").match(/<img[^>]+src=["']([^"']+)["']/i)?.[1]
     || String(content || "").match(/!\[[^\]]*\]\(([^)\s]+)(?:\s+[^)]*)?\)/i)?.[1];
   return image && /^(?:https?:\/\/|\/)/i.test(image) ? image : null;
+}
+
+function documentationMetadata(sourcePath) {
+  const normalizedPath = String(sourcePath || "").replaceAll("\\", "/");
+  const parts = normalizedPath.split("/");
+  const llmsIndex = parts.indexOf("llms");
+  const relativeParts = llmsIndex >= 0 ? parts.slice(llmsIndex + 1) : parts;
+  const category = relativeParts[0] || null;
+  const service = relativeParts[1] || category || null;
+  const documentType = relativeParts.at(-1)?.replace(/\.(?:md|mdx|html?)$/i, "") || null;
+  return { category, service, documentType };
 }
 
 function splitTextSafely(text) {
@@ -177,6 +197,7 @@ export async function loadDocuments() {
         sectionTokens: tokens(chunk.section),
         bodyTokens: new Set(tokens(body)),
         pathTokens: tokens(relativePath),
+        ...documentationMetadata(relativePath),
       });
     }
   }
@@ -190,6 +211,7 @@ function searchableDocument(document) {
     sectionTokens: tokens(document.section),
     bodyTokens: new Set(tokens(document.body)),
     pathTokens: tokens(document.path),
+    ...documentationMetadata(document.path),
   };
 }
 
@@ -199,19 +221,23 @@ function scoreDocument(document, query, queryTokens) {
   const titleMatches = queryTokens.filter((token) => matchesToken(token, document.titleTokens)).length;
   const sectionMatches = queryTokens.filter((token) => matchesToken(token, document.sectionTokens)).length;
   const pathMatches = queryTokens.filter((token) => matchesToken(token, document.pathTokens)).length;
-  const structuralMatches = titleMatches + sectionMatches + pathMatches;
+  const metadataTokens = tokens(`${document.category || ""} ${document.service || ""} ${document.documentType || ""}`);
+  const metadataMatches = queryTokens.filter((token) => matchesToken(token, metadataTokens)).length;
+  const structuralMatches = titleMatches + sectionMatches + pathMatches + metadataMatches;
   let score = (matchingTokens.length / Math.max(queryTokens.length, 1)) * 2;
   if (normalizedQuery.length > 3 && document.title.toLocaleLowerCase("fa").includes(normalizedQuery)) score += 4;
   if (normalizedQuery.length > 3 && document.section.toLocaleLowerCase("fa").includes(normalizedQuery)) score += 2.5;
   if (normalizedQuery.length > 5 && document.body.toLocaleLowerCase("fa").includes(normalizedQuery)) score += 2;
   score += titleMatches * 2.2 + sectionMatches * 1.6 + pathMatches;
+  score += metadataMatches * 2.4;
   score += documentationDomainBoost(document.path, query);
+  score += technicalPathBoost(document, query);
   score += Number(document.dbScore || 0);
   return { document, score, coverage: matchingTokens.length, structuralMatches };
 }
 
 function rankDocuments(documents, query) {
-  const queryTokens = [...new Set(tokens(normalizeText(query)))];
+  const queryTokens = queryTokensForSearch(query);
   const minimumCoverage = queryTokens.length <= 2
     ? 1
     : queryTokens.length <= 5
@@ -257,10 +283,37 @@ function documentationDomainBoost(relativePath, query) {
   return boost;
 }
 
+const TECHNICAL_TERM_PATTERN = /^(?:api|api-key|cli|docker|redis|postgres|postgresql|mysql|mongodb|ssh|http|https|graphql|deploy|deployment|node|node\.js|python|php|token|cors|dns|ssl|tls)$/iu;
+const TECHNICAL_PATH_BOOSTS = [
+  { pattern: /\bapi\b|کلید\s+(?:دسترسی|api)/iu, paths: ["/references/api/"], boost: 9 },
+  { pattern: /\bcli\b|خط\s*فرمان/iu, paths: ["/references/cli/"], boost: 7 },
+  { pattern: /\bdocker\b|داکر/iu, paths: ["/paas/docker/", "/docker/"], boost: 6 },
+  { pattern: /\bredis\b|ردیس/iu, paths: ["/redis/"], boost: 6 },
+  { pattern: /postgres(?:ql)?|پستگرس/iu, paths: ["/postgresql/"], boost: 6 },
+  { pattern: /\bssh\b/iu, paths: ["/iaas/", "/ssh/"], boost: 4 },
+  { pattern: /deploy|deployment|استقرار|دیپلوی/iu, paths: ["/deploy/", "/getting-started/", "/paas/"], boost: 2 },
+];
+
+function technicalPathBoost(document, query) {
+  const normalizedPath = String(document.path || "").replaceAll("\\", "/").toLowerCase();
+  let boost = 0;
+  for (const entry of TECHNICAL_PATH_BOOSTS) {
+    if (entry.pattern.test(query) && entry.paths.some((segment) => normalizedPath.includes(segment))) boost += entry.boost;
+  }
+  if (/\bapi\b/iu.test(query) && normalizedPath.includes("/api/")) boost += 3;
+  return boost;
+}
+
+function queryTokensForSearch(value) {
+  const salient = queryTokens(value);
+  return salient.length ? salient : [...new Set(tokens(value))];
+}
+
 function expandQuery(query) {
   const normalizedQuery = normalizeText(query);
+  const salientQuery = queryTokensForSearch(normalizedQuery).join(" ");
   const synonyms = QUERY_SYNONYMS.filter(([pattern]) => pattern.test(normalizedQuery)).map(([, value]) => value);
-  return `${normalizedQuery} ${synonyms.join(" ")}`.trim();
+  return `${salientQuery} ${synonyms.join(" ")}`.trim();
 }
 
 export async function searchDocumentation(query) {
@@ -297,6 +350,9 @@ async function searchDocumentationDatabase(query) {
       d."sourcePath" AS "path",
       d."url",
       d."imageUrl",
+      d."category",
+      d."service",
+      d."documentType",
       ts_rank(
         to_tsvector('simple', c."normalizedText"),
         to_tsquery('simple', ${tsQuery})
@@ -335,6 +391,7 @@ function onlineHitToDocumentation(hit) {
     element: hit.element,
     type: hit.type,
     src: hit.src,
+    ...documentationMetadata(hit.path),
   };
 }
 
@@ -361,7 +418,7 @@ export function isValidDocumentationUrl(value) {
 }
 
 const SENSITIVE_TEXT_PATTERNS = [
-  /(?:api[_ -]?key|token|secret|password|رمز(?:\s*عبور)?|کلید(?:\s+خصوصی)?|پسورد)\s*[:=]\s*[^\s`,'")]+/giu,
+  /(?:api[_ -]?key|token|secret|password|رمز(?:\s*عبور)?|کلید(?:\s+خصوصی)?|پسورد)\s*[:=]\s*(?:["'`][^"'`\r\n]{8,}["'`]|[A-Za-z0-9._~+/=-]{16,})/giu,
   /(?:postgres(?:ql)?|mysql|mongodb|redis):\/\/[^\s`'"<>]+/giu,
   /\b(?:bearer|basic)\s+[A-Za-z0-9._~+/=-]{12,}/giu,
   /-----BEGIN [^-]+ PRIVATE KEY-----[\s\S]*?-----END [^-]+ PRIVATE KEY-----/giu,
@@ -382,6 +439,9 @@ export function formatDocumentationContext(hits) {
 مسیر فایل: ${hit.path}
 لینک Documentation: ${hit.url || ""}
 بخش مربوطه: ${hit.section}
+دسته: ${hit.category || ""}
+سرویس: ${hit.service || ""}
+نوع سند: ${hit.documentType || ""}
 محتوا:
 ${body}
 </documentation-source>`;
@@ -423,5 +483,8 @@ export function toPublicDocumentationHit(hit) {
     platform: hit.platform,
     element: hit.element,
     type: hit.type,
+    category: hit.category || documentationMetadata(hit.path).category,
+    service: hit.service || documentationMetadata(hit.path).service,
+    documentType: hit.documentType || documentationMetadata(hit.path).documentType,
   };
 }
