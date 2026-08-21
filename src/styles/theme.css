@@ -46,6 +46,27 @@ body {
   mask-image: linear-gradient(to bottom, black, transparent 85%);
 }
 
+.admin-auth-shell {
+  height: 100dvh;
+  max-height: 100dvh;
+  overflow: hidden;
+}
+
+.admin-auth-shell > div {
+  max-height: 100%;
+}
+
+@media (max-width: 767px) {
+  .admin-auth-shell > div,
+  .admin-login-card {
+    height: auto;
+  }
+
+  .admin-auth-shell .admin-login-card {
+    max-height: calc(100dvh - 2rem);
+  }
+}
+
 .dark .admin-shell [class*="bg-[#f5f7fb]"],
 .dark .admin-shell [class*="bg-[#fbfcfe]"],
 .dark .admin-shell [class*="bg-white"],

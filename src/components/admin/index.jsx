@@ -258,7 +258,7 @@ function AdminHeader({ onMenu, onNavigate, onRefresh, onLogout, user }) {
 }
 
 function AdminAuthView() {
-  return <><Head><title>ورود به پنل مدیریت | لیارا</title><meta name="description" content="ورود امن به پنل مدیریت لیارا" /></Head><main dir="rtl" className="admin-auth-shell relative flex min-h-dvh items-center justify-center overflow-hidden bg-[hsl(var(--site-bg))] px-4 py-10 sm:px-6 lg:py-14"><div className="relative w-full max-w-[1120px]"><LoginForm /></div></main></>;
+  return <><Head><title>ورود به پنل مدیریت | لیارا</title><meta name="description" content="ورود امن به پنل مدیریت لیارا" /></Head><main dir="rtl" className="admin-auth-shell relative flex h-dvh max-h-dvh items-center justify-center overflow-hidden bg-[hsl(var(--site-bg))] px-4 py-4 sm:px-6 lg:py-8"><div className="relative h-auto max-h-full w-full max-w-[1120px]"><LoginForm /></div></main></>;
 }
 
 function AdminDashboardShell({ session }) {

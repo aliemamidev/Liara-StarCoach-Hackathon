@@ -82,8 +82,8 @@ export function LoginForm({ className, ...props }) {
 
   return (
     <div className={cn("flex flex-col gap-4", className)} dir="rtl" {...props}>
-      <Card className="overflow-hidden rounded-[28px] border-[hsl(var(--site-border))] bg-[hsl(var(--site-surface))] shadow-[0_24px_70px_hsl(var(--site-text)/.12)]">
-        <CardContent className="grid min-h-[620px] p-0 md:grid-cols-2">
+      <Card className="admin-login-card h-auto max-h-full overflow-hidden rounded-[28px] border-[hsl(var(--site-border))] bg-[hsl(var(--site-surface))] shadow-[0_24px_70px_hsl(var(--site-text)/.12)]">
+        <CardContent className="grid h-auto min-h-0 p-0 md:grid-cols-2">
           <form className="order-2 flex items-center p-7 sm:p-10 md:order-2 lg:p-14" onSubmit={submit} noValidate>
             <div className="w-full">
               <div className="mb-10 flex items-center justify-between md:hidden">
@@ -110,7 +110,7 @@ export function LoginForm({ className, ...props }) {
                 <Label htmlFor="admin-password" className="text-[13px] font-extrabold">رمز عبور</Label>
                 <div className="relative">
                   <Input id="admin-password" type={showPassword ? "text" : "password"} autoComplete="current-password" dir="ltr" value={values.password} onChange={update("password")} onBlur={() => validateField("password")} aria-invalid={Boolean(errors.password)} aria-describedby={errors.password ? "admin-password-error" : undefined} className="h-12 rounded-xl border-[hsl(var(--site-border))] bg-[hsl(var(--site-input))] pe-12 text-left focus-visible:ring-[hsl(var(--site-accent))]" required />
-                  <button type="button" onClick={() => { setShowPassword((current) => !current); sound.playSound("toggle"); }} aria-label={showPassword ? "مخفی کردن رمز عبور" : "نمایش رمز عبور"} className="absolute end-1 top-1 flex h-10 w-10 items-center justify-center rounded-lg text-[hsl(var(--site-muted))] transition hover:bg-[hsl(var(--site-muted)/.12)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[hsl(var(--site-accent))]">
+                  <button type="button" onClick={() => { setShowPassword((current) => !current); sound.playSound("toggle"); }} aria-label={showPassword ? "مخفی کردن رمز عبور" : "نمایش رمز عبور"} className="absolute right-1 top-1 flex h-10 w-10 items-center justify-center rounded-lg text-[hsl(var(--site-muted))] transition hover:bg-[hsl(var(--site-muted)/.12)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[hsl(var(--site-accent))]">
                     {showPassword ? <EyeOff size={18} aria-hidden="true" /> : <Eye size={18} aria-hidden="true" />}
                   </button>
                 </div>
@@ -124,11 +124,11 @@ export function LoginForm({ className, ...props }) {
             </div>
           </form>
 
-          <div className="login-visual order-1 relative hidden min-h-[620px] overflow-hidden bg-[hsl(var(--site-brand-surface))] md:order-1 md:block">
-            <Image src="/static/images/liara-admin-login-visual.png" alt="زیرساخت ابری و سرویس‌های لیارا" fill priority sizes="(max-width: 1024px) 50vw, 520px" className="object-cover object-center" />
+          <div className="login-visual order-1 relative hidden min-h-0 overflow-hidden bg-[hsl(var(--site-brand-surface))] md:order-1 md:block">
+            <Image src="/static/images/liara-admin-login-visual.png" alt="زیرساخت ابری و سرویس‌های لیارا" fill priority sizes="(max-width: 1024px) 50vw, 560px" className="object-cover object-center" />
             <div className="absolute inset-0 bg-gradient-to-b from-[hsl(var(--site-brand-surface)/.12)] via-transparent to-[hsl(var(--site-brand-surface)/.28)]" aria-hidden="true" />
             <div className="absolute inset-x-8 top-8 flex items-center justify-between">
-              <Image src="/static/logo.svg" alt="لیارا" width={91} height={40} priority className="h-10 w-auto brightness-0 invert" />
+              <Image src="/static/logo.svg" alt="لیارا" width={91} height={40} priority className="h-10 w-auto" />
             </div>
           </div>
         </CardContent>
