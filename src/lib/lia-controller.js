@@ -244,7 +244,7 @@ export async function createLiaControllerPlan(messages, settings = {}) {
     if (!isStrongKnowledgeEvidence(brainHits, query) && conversation !== query) brainHits = await searchKnowledge(retrievalQuery);
   } catch { brainHits = []; }
   if (isStrongKnowledgeEvidence(brainHits, query) || isStrongKnowledgeEvidence(brainHits, retrievalQuery)) {
-    return { mode: LIA_STAGES.ANSWER, stage: LIA_STAGES.ANSWER, query, hits: [], brainHits, searchTrace };
+    return { mode: LIA_STAGES.ANSWER, stage: LIA_STAGES.ANSWER, query, hits: [], brainHits, searchTrace, includeSources: !generalTechnical };
   }
 
   searchTrace.push("local_docs");
@@ -267,6 +267,7 @@ export async function createLiaControllerPlan(messages, settings = {}) {
       hits,
       brainHits,
       searchTrace,
+      includeSources: !generalTechnical,
     };
   }
 
@@ -276,7 +277,7 @@ export async function createLiaControllerPlan(messages, settings = {}) {
     if (web.available) hits = mergeHits(hits, web.hits);
     documentationAvailable = documentationAvailable || web.available;
     if (isStrongEvidence(hits, retrievalQuery)) {
-      return { mode: LIA_STAGES.ANSWER, stage: LIA_STAGES.ANSWER, query, hits, brainHits, searchTrace };
+      return { mode: LIA_STAGES.ANSWER, stage: LIA_STAGES.ANSWER, query, hits, brainHits, searchTrace, includeSources: !generalTechnical };
     }
   }
 

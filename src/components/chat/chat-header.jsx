@@ -2,7 +2,7 @@
 import { useEffect, useState } from "react";
 import Link from "next/link";
 import Image from "next/image";
-import { BookOpen, History, Moon, Settings2, Sun } from "lucide-react";
+import { BookOpen, Moon, Settings2, Sun } from "lucide-react";
 import { useTheme } from "next-themes";
 import { Button } from "@/components/ui/button";
 import {
@@ -13,7 +13,7 @@ import {
 } from "@/components/ui/tooltip";
 
 
-export function ChatHeader({ onOpenSettings, onOpenHistory }) {
+export function ChatHeader({ onOpenSettings }) {
   const { resolvedTheme, setTheme } = useTheme();
   const [mounted, setMounted] = useState(false);
 
@@ -62,14 +62,6 @@ export function ChatHeader({ onOpenSettings, onOpenHistory }) {
               </Button>
             </TooltipTrigger>
             <TooltipContent>مستندات اصلی</TooltipContent>
-          </Tooltip>
-          <Tooltip>
-            <TooltipTrigger asChild>
-              <Button variant="ghost" size="icon" className="chat-header-action" aria-label="باز کردن تاریخچه" onClick={onOpenHistory}>
-                <History size={19} aria-hidden="true" />
-              </Button>
-            </TooltipTrigger>
-            <TooltipContent>تاریخچه</TooltipContent>
           </Tooltip>
           <Tooltip>
             <TooltipTrigger asChild>

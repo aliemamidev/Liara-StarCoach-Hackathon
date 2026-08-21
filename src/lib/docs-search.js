@@ -280,6 +280,6 @@ export function formatDocumentationSources(hits) {
   const unique = [...new Map(hits.map((hit) => [hit.url || hit.path || hit.title, hit])).values()].slice(0, 1);
   return `\n\n## منبع پاسخ\n\n📄 منابع مرتبط:\n\n${unique.map((hit) => {
     const isWeb = hit.sourceType === "WEB";
-    return `- عنوان منبع: ${hit.title}\n  - ${isWeb ? `[${hit.title}](${hit.url})` : `مسیر فایل: \`${hit.path}\`\n  - [${hit.title}](${hit.url || "https://docs.liara.ir/"})`}`;
+    return `- ${isWeb ? `[${hit.title}](${hit.url})` : `[${hit.title}](${hit.url || "https://docs.liara.ir/"})`}`;
   }).join("\n")}`;
 }

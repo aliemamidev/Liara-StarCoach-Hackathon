@@ -24,7 +24,6 @@ export function ChatLayout() {
   const [files, setFiles] = useState([]);
   const [settingsOpen, setSettingsOpen] = useState(false);
 
-  const [historyOpen, setHistoryOpen] = useState(false);
   const [screenshotOpen, setScreenshotOpen] = useState(false);
   const [screenshotSourceOpen, setScreenshotSourceOpen] = useState(false);
   const [screenshotError, setScreenshotError] = useState("");
@@ -157,7 +156,6 @@ export function ChatLayout() {
     setMessages([]);
     setFiles([]);
     setInput("");
-    setHistoryOpen(false);
   }
 
   function selectChat(id) {
@@ -169,7 +167,6 @@ export function ChatLayout() {
     setMessages(chat.messages);
     setFiles([]);
     setInput("");
-    setHistoryOpen(false);
   }
 
   function captureScreenshot(file) {
@@ -235,7 +232,6 @@ export function ChatLayout() {
           sound.playSound("toggle");
         }}
 
-        onOpenHistory={() => setHistoryOpen(true)}
       />
       {offline && <div className="chat-persistence-banner" role="status">اتصال ذخیره‌سازی برقرار نیست؛ نمایش فعلی موقت است و پس از بازگشت اتصال همگام می‌شود.</div>}
       <section ref={messagesViewportRef} className="chat-main">
@@ -286,8 +282,6 @@ export function ChatLayout() {
       />
 
       <ChatHistory
-        open={historyOpen}
-        onOpenChange={setHistoryOpen}
         history={chatHistory.history}
         activeChatId={chatHistory.activeChatId}
         onSelect={selectChat}

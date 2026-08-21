@@ -1140,7 +1140,11 @@ pre code {
 .chat-message-attachments { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 10px; }
 .chat-voice-interim, .chat-composer-error { margin: 4px 8px 0; color: hsl(var(--chat-accent)); font-size: 12px; line-height: 1.7; }
 .chat-composer-error { color: hsl(0 65% 48%); }
-.chat-history-sheet { overflow-y: auto; }
+.chat-history-dock { position: fixed; top: 0; right: 0; bottom: 0; z-index: 20; display: flex; width: 280px; flex-direction: column; overflow-y: auto; border-left: 1px solid hsl(var(--chat-border)); background: hsl(var(--chat-surface) / .96); padding: 24px 16px; box-shadow: -10px 0 30px hsl(var(--chat-text) / .06); backdrop-filter: blur(14px); }
+.chat-history-dock-header { padding: 4px 8px 0; }
+.chat-history-dock-header h2 { color: hsl(var(--chat-text)); font-size: 15px; font-weight: 800; }
+.chat-history-dock-header p { margin-top: 5px; color: hsl(var(--chat-muted)); font-size: 11px; line-height: 1.7; }
+.chat-shell:has(.chat-history-dock) { padding-right: 280px; }
 .chat-history-list { display: flex; flex-direction: column; gap: 6px; margin-top: 18px; }
 .chat-history-empty { padding: 28px 8px; color: hsl(var(--chat-muted)); font-size: 13px; text-align: center; }
 .chat-history-item { display: flex; align-items: center; gap: 4px; border: 1px solid transparent; border-radius: 12px; padding: 4px; }
@@ -1172,6 +1176,8 @@ pre code {
 .dark body { background: hsl(var(--chat-bg)) !important; }
 @media (max-width: 640px) { .chat-screenshot-toolbar { top: 10px; max-width: calc(100% - 20px); } .chat-screenshot-toolbar span { overflow: hidden; text-overflow: ellipsis; } }
 @media (max-width: 640px) { .chat-header { padding: 12px 12px; } .chat-header-actions { flex: 0 0 auto; gap: 2px; } .chat-header-action { min-height: 44px; min-width: 44px; } .chat-header-action svg { height: 21px; width: 21px; } .chat-header-docs-action { display: inline-flex; } .chat-header > div:first-child { min-width: 0; } .chat-header > div:first-child > div { min-width: 0; } .chat-header > div:first-child p { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; } .chat-main { padding-inline: 12px; } .chat-message-user { max-width: 92%; } .chat-composer-wrap { padding-inline: 12px; } .chat-composer-hint { display: none; } .chat-docs-link { display: none; } }
+
+@media (max-width: 820px) { .chat-history-dock { width: 240px; padding-inline: 10px; } .chat-shell:has(.chat-history-dock) { padding-right: 240px; } }
 
 @media (max-width: 1024px) {
   .chat-header-docs-action { display: inline-flex; }

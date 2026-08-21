@@ -135,7 +135,7 @@ export default async function handler(req, res) {
       if (isUnsafeLiaDraft(entry.answer)) return await pipeEscalation(res, messages, chatId, plan);
       await prisma.knowledgeEntry.update({ where: { id: entry.id }, data: { usageCount: { increment: 1 } } }).catch(() => {});
       const answer = entry.answer.trim().startsWith("## پاسخ") ? entry.answer.trim() : `## پاسخ\n\n${entry.answer.trim()}`;
-      return await pipeStaticMessage(res, messages, `${answer}${formatKnowledgeSources([entry])}`, plan.stage);
+      return await pipeStaticMessage(res, messages, `${answer}${plan.includeSources === false ? "" : formatKnowledgeSources([entry])}`, plan.stage);
     }
 
     const config = getAiConfig();
@@ -158,7 +158,7 @@ export default async function handler(req, res) {
       return await pipeEscalation(res, messages, chatId, plan);
     }
     const finalText = plan.mode === LIA_STAGES.ANSWER
-      ? `${answer.trim()}${formatKnowledgeSources(plan.brainHits || [])}${formatDocumentationSources(plan.hits || [])}`
+      ? `${answer.trim()}${plan.includeSources === false ? "" : `${formatKnowledgeSources(plan.brainHits || [])}${formatDocumentationSources(plan.hits || [])}`}`
       : answer.trim();
 
     const stream = createUIMessageStream({

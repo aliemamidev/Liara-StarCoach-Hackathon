@@ -1,13 +1,12 @@
 import { Check, Clock3, MessageSquarePlus, Pencil, Trash2, X } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
 import { Button } from "@/components/ui/button";
-import { Sheet, SheetContent, SheetDescription, SheetHeader, SheetTitle } from "@/components/ui/sheet";
 
 function formatDate(timestamp) {
   return new Intl.DateTimeFormat("fa-IR", { dateStyle: "short", timeStyle: "short" }).format(timestamp);
 }
 
-export function ChatHistory({ open, onOpenChange, history, activeChatId, onSelect, onNewChat, onDelete, onRename }) {
+export function ChatHistory({ history, activeChatId, onSelect, onNewChat, onDelete, onRename }) {
   const [editingId, setEditingId] = useState(null);
   const [draftTitle, setDraftTitle] = useState("");
   const inputRef = useRef(null);
@@ -42,12 +41,11 @@ export function ChatHistory({ open, onOpenChange, history, activeChatId, onSelec
   }
 
   return (
-    <Sheet open={open} onOpenChange={onOpenChange}>
-      <SheetContent side="right" dir="rtl" className="chat-history-sheet">
-        <SheetHeader>
-          <SheetTitle>تاریخچه‌ی گفتگوها</SheetTitle>
-          <SheetDescription>گفتگوهای ذخیره‌شده در همین مرورگر</SheetDescription>
-        </SheetHeader>
+    <aside className="chat-history-dock" dir="rtl" aria-label="تاریخچه‌ی گفتگوها">
+        <div className="chat-history-dock-header">
+          <h2>تاریخچه‌ی گفتگوها</h2>
+          <p>گفتگوهای ذخیره‌شده در همین مرورگر</p>
+        </div>
         <Button type="button" className="mt-6 w-full justify-start" onClick={onNewChat}>
           <MessageSquarePlus size={17} aria-hidden="true" /> چت جدید
         </Button>
@@ -89,7 +87,6 @@ export function ChatHistory({ open, onOpenChange, history, activeChatId, onSelec
             </div>
           ))}
         </div>
-      </SheetContent>
-    </Sheet>
+    </aside>
   );
 }
