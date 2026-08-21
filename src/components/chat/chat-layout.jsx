@@ -191,7 +191,11 @@ export function ChatLayout() {
       stream = await navigator.mediaDevices.getDisplayMedia({
         audio: false,
         video: { displaySurface },
-        ...(source === "browser" ? { preferCurrentTab: true, selfBrowserSurface: "include" } : {}),
+        ...(source === "browser" ? {
+          preferCurrentTab: false,
+          selfBrowserSurface: "include",
+          surfaceSwitching: "include",
+        } : {}),
       });
       const track = stream.getVideoTracks()[0];
       if (!track) throw new Error("screenshot-track-missing");

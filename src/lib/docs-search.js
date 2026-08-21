@@ -2,12 +2,13 @@ import fs from "node:fs/promises";
 import path from "node:path";
 import MeiliSearch from "meilisearch";
 
-const MAX_RESULTS = 4;
+const MAX_RESULTS = 1;
 const MAX_BODY_LENGTH = 4200;
 const CHUNK_LENGTH = 2200;
 const DOCUMENTATION_ROOTS = ["public/llms"];
 const ONLINE_INDEX = "docs";
 const DATABASE_QUERY_PATTERN = /(?:دیتابیس|پایگاه\s+داده|database|postgres(?:ql)?|mysql|mariadb|mongodb|mongo|redis|rabbitmq|elasticsearch|elastic\s*search|mssql|sql\s*server|sqlite|بکاپ|backup|بازیابی|restore|connection\s*pool|اتصال\s+به\s+(?:دیتابیس|پایگاه))/iu;
+const SEARCH_STOP_WORDS = new Set(["به", "در", "برای", "با", "از", "و", "را", "یک", "این", "آن", "برنامه", "روش", "است", "های", "کردن"]);
 let documentsPromise;
 let onlineClient;
 
@@ -21,7 +22,8 @@ function normalizeText(value) {
 }
 
 function tokens(value) {
-  return normalizeText(value).toLocaleLowerCase("fa").match(/[\p{L}\p{N}]+/gu) || [];
+  return (normalizeText(value).toLocaleLowerCase("fa").match(/[\p{L}\p{N}]+/gu) || [])
+    .filter((token) => !SEARCH_STOP_WORDS.has(token));
 }
 
 const QUERY_SYNONYMS = [
@@ -159,6 +161,14 @@ function scoreDocument(document, query, queryTokens) {
 function documentationDomainBoost(relativePath, query) {
   const normalizedPath = String(relativePath || "").replaceAll("\\", "/").toLowerCase();
   let boost = 0;
+  const databaseTechnology = [
+    [/(?:postgres(?:ql)?|پستگرس)/iu, "/postgresql/"],
+    [/(?:mysql|مای.?اس.?کیو.?ال)/iu, "/mysql/"],
+    [/(?:mariadb|ماریا)/iu, "/mariadb/"],
+    [/(?:mongodb|mongo|مانگو)/iu, "/mongodb/"],
+    [/(?:redis|ردیس)/iu, "/redis/"],
+  ].find(([pattern]) => pattern.test(query));
+  if (databaseTechnology?.[1] && normalizedPath.includes(databaseTechnology[1])) boost += 8;
   if (/(?:\bnode(?:\.js)?\b|نود)/iu.test(query)) {
     if (normalizedPath.includes("/nodejs/")) boost += 5;
     else if (normalizedPath.includes("/docker/")) boost -= 1;
@@ -267,9 +277,9 @@ export function toInternalDocumentationUrl(value) {
 
 export function formatDocumentationSources(hits) {
   if (!hits?.length) return "";
-  const unique = [...new Map(hits.map((hit) => [hit.url || hit.path || hit.title, hit])).values()].slice(0, MAX_RESULTS);
+  const unique = [...new Map(hits.map((hit) => [hit.url || hit.path || hit.title, hit])).values()].slice(0, 1);
   return `\n\n## منبع پاسخ\n\n📄 منابع مرتبط:\n\n${unique.map((hit) => {
     const isWeb = hit.sourceType === "WEB";
-    return `- عنوان منبع: ${hit.title}\n  - ${isWeb ? `[${hit.title}](${hit.url})` : `مسیر فایل: \`${hit.path}\`\n  - [${hit.title}](${toInternalDocumentationUrl(hit.url)})`}`;
+    return `- عنوان منبع: ${hit.title}\n  - ${isWeb ? `[${hit.title}](${hit.url})` : `مسیر فایل: \`${hit.path}\`\n  - [${hit.title}](${hit.url || "https://docs.liara.ir/"})`}`;
   }).join("\n")}`;
 }

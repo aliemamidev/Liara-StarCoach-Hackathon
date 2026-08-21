@@ -87,7 +87,7 @@ export function ChatMessage({ message, onRetry, playSound, isStreaming, isLive, 
               {renderedContent}
             </ReactMarkdown>
           )
-        ) : (isStreaming ? "" : "پاسخی دریافت نشد.")}
+        ) : (isStreaming || message.metadata?.liaAction === "screenshot" ? "" : "پاسخی دریافت نشد.")}
       </div>
       {!isUser && message.metadata?.liaAction === "screenshot" && onScreenshot && (
         <div className="mt-3 rounded-2xl border border-[hsl(var(--chat-accent)/.25)] bg-[hsl(var(--chat-accent)/.07)] p-3">
@@ -116,5 +116,4 @@ export function ChatMessage({ message, onRetry, playSound, isStreaming, isLive, 
 }
 
 export { messageText };
-
 

@@ -27,7 +27,7 @@ function scoreEntry(entry, queryTokens, normalizedQuery) {
   return { ...entry, score, coverage };
 }
 
-export async function searchKnowledge(query, limit = 5) {
+export async function searchKnowledge(query, limit = 1) {
   const normalizedQuery = normalizeKnowledgeText(query);
   const queryTokens = [...new Set(tokens(normalizedQuery))];
   if (!queryTokens.length) return [];
@@ -60,7 +60,7 @@ ${entry.answer}
 
 export function formatKnowledgeSources(entries = []) {
   if (!entries.length) return "";
-  return `\n\n## منبع پاسخ\n\n🧠 دانش تأییدشدهٔ لیارا:\n\n${entries.map((entry) => `- ${entry.question}`).join("\n")}`;
+  return `\n\n## منبع پاسخ\n\n🧠 دانش تأییدشدهٔ لیارا:\n\n- ${entries[0].question}`;
 }
 
 export function knowledgeSummary(entry) {
