@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from "react";
 import html2canvas from "html2canvas";
 import { Check, X } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { canvasToJpegFile } from "@/lib/screenshot";
 
 function selectionRect(start, current) {
   const left = Math.min(start.x, current.x);
@@ -72,12 +73,10 @@ export function ScreenshotOverlay({ onCapture, onCancel }) {
       crop.width = Math.round(rect.width * scale);
       crop.height = Math.round(rect.height * scale);
       crop.getContext("2d").drawImage(canvas, rect.left * scale, rect.top * scale, crop.width, crop.height, 0, 0, crop.width, crop.height);
-      const blob = await new Promise((resolve) => crop.toBlob(resolve, "image/png"));
-      if (!blob) throw new Error("screenshot-empty");
       const timestamp = new Date().toISOString().replace(/[:.]/g, "-").slice(0, 19);
-      onCapture(new File([blob], `screenshot-${timestamp}.png`, { type: "image/png" }));
-    } catch {
-      onCancel("گرفتن تصویر ممکن نشد. دوباره تلاش کنید.");
+      onCapture(await canvasToJpegFile(crop, `screenshot-${timestamp}.jpg`));
+    } catch (error) {
+      onCancel(error?.message === "screenshot-too-large" ? "تصویر بزرگ‌تر از حد مجاز است؛ محدوده کوچک‌تری انتخاب کنید." : "گرفتن تصویر ممکن نشد. دوباره تلاش کنید.");
     }
   }
 
@@ -100,5 +99,4 @@ export function ScreenshotOverlay({ onCapture, onCancel }) {
     </div>
   );
 }
-
 

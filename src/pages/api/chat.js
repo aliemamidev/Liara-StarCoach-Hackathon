@@ -16,28 +16,8 @@ import { getAdminSettings } from "@/lib/admin-settings";
 import { publishRealtime } from "@/lib/realtime.mjs";
 import { AI_UNAVAILABLE_MESSAGE, createLiaControllerPlan, isUnsafeLiaDraft, LIA_STAGES, OUT_OF_SCOPE_MESSAGE, PROBABLE_FALLBACK_NOTICE, UNSAFE_DRAFT_MESSAGE, validateLiaDraft } from "@/lib/lia-controller";
 import { LIA_PROBABLE_SYSTEM_PROMPT, LIA_SYSTEM_PROMPT } from "@/lib/lia-persona";
-
-function validMessages(messages) {
-  return (
-    Array.isArray(messages) &&
-    messages.length > 0 &&
-    messages.length <= 50 &&
-    messages.every(
-      (message) =>
-        message &&
-        ["user", "assistant", "system"].includes(message.role) &&
-        Array.isArray(message.parts) &&
-        message.parts.every((part) => {
-          if (part?.type === "text") return typeof part.text === "string" && part.text.length <= 20000;
-          if (part?.type !== "file") return true;
-          const mediaType = String(part.mediaType || "");
-          const allowed = mediaType.startsWith("image/") || mediaType.startsWith("text/") || mediaType === "application/json";
-          const url = part.url === undefined ? "" : String(part.url);
-          return allowed && url.length <= 6 * 1024 * 1024 && (!url || url.startsWith("data:") || url.startsWith("https://"));
-        }),
-    )
-  );
-}
+import { validateChatMessages } from "@/lib/chat-message-validation.mjs";
+import { originalMessagesForContactFlow } from "@/lib/contact-flow.mjs";
 
 function pipeStaticMessage(response, messages, message, stage, metadata = {}) {
   const stream = createUIMessageStream({
@@ -105,6 +85,7 @@ function latestUserText(messages) {
   const message = [...messages].reverse().find((item) => item.role === "user");
   return (message?.parts || []).filter((part) => part?.type === "text").map((part) => part.text || "").join(" ").trim();
 }
+
 async function pipeContactRequest(response, messages) {
   return pipeStaticMessage(response, messages, CONTACT_REQUEST_MESSAGE, CONTACT_STAGE, { liaAction: "contact" });
 }
@@ -116,7 +97,7 @@ export default async function handler(req, res) {
   }
 
   const messages = req.body?.messages;
-  if (!validMessages(messages)) {
+  if (!validateChatMessages(messages)) {
     return res.status(400).json({ error: "پیام‌های ارسالی معتبر نیستند." });
   }
 
@@ -128,10 +109,12 @@ export default async function handler(req, res) {
     if (!owner.userId && priorAssistant?.metadata?.liaStage === CONTACT_STAGE) {
       const contact = parseGuestContact(latestUserText(messages));
       if (!contact) return await pipeContactRequest(res, messages);
-      const originalPlan = await createLiaControllerPlan(messages.slice(0, -1), settings);
+      const originalMessages = originalMessagesForContactFlow(messages);
+      const originalPlan = await createLiaControllerPlan(originalMessages, settings);
       return await pipeEscalation(res, messages, chatId, originalPlan, contact);
     }
     const plan = await createLiaControllerPlan(messages, settings);
+    if (plan.metadata?.staticAnswer) return await pipeStaticMessage(res, messages, plan.metadata.staticAnswer, LIA_STAGES.ANSWER, plan.metadata);
     if (plan.mode === LIA_STAGES.OUT_OF_SCOPE) return await pipeStaticMessage(res, messages, OUT_OF_SCOPE_MESSAGE, plan.stage);
     if (plan.mode === LIA_STAGES.CLARIFICATION || plan.mode === LIA_STAGES.SCREENSHOT) {
       return await pipeStaticMessage(res, messages, plan.message, plan.stage, plan.metadata || {});

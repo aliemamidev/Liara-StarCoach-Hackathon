@@ -1,4 +1,5 @@
 import { ChatActions } from "@/components/chat/chat-actions";
+import Image from "next/image";
 import { useEffect, useRef, useState } from "react";
 import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
@@ -101,7 +102,7 @@ export function ChatMessage({ message, onRetry, playSound, isStreaming, isLive, 
         <div className="chat-message-attachments">
           {attachments.map((attachment, index) => (
             <div className="chat-attachment-chip" key={`${attachment.url}-${index}`}>
-              {attachment.mediaType?.startsWith("image/") ? <img src={attachment.url} alt={attachment.filename || "فایل پیوست"} className="chat-attachment-image" /> : null}
+              {attachment.mediaType?.startsWith("image/") ? <Image unoptimized width={28} height={28} src={attachment.url} alt={attachment.filename || "فایل پیوست"} className="chat-attachment-image" /> : null}
               <span className="max-w-40 truncate">{attachment.filename || "فایل پیوست"}</span>
             </div>
           ))}
@@ -115,6 +116,5 @@ export function ChatMessage({ message, onRetry, playSound, isStreaming, isLive, 
 }
 
 export { messageText };
-
 
 

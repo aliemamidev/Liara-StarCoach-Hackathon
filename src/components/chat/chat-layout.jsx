@@ -1,6 +1,6 @@
 
 import { useEffect, useMemo, useRef, useState } from "react";
-import { DefaultChatTransport } from "ai";
+import { convertFileListToFileUIParts, DefaultChatTransport } from "ai";
 import { useChat } from "@ai-sdk/react";
 import { AlertCircle, BookOpen } from "lucide-react";
 import Link from "next/link";
@@ -16,6 +16,8 @@ import { ScreenshotOverlay } from "@/components/chat/screenshot-overlay";
 import { ScreenshotSourceDialog } from "@/components/chat/screenshot-source-dialog";
 import { useUiSound } from "@/hooks/use-ui-sound";
 import { useChatHistory } from "@/hooks/use-chat-history";
+import { MAX_CHAT_FILES } from "@/lib/chat-message-validation.mjs";
+import { canvasToJpegFile } from "@/lib/screenshot";
 
 export function ChatLayout() {
   const [input, setInput] = useState("");
@@ -34,15 +36,20 @@ export function ChatLayout() {
   const messagesViewportRef = useRef(null);
   const titleRequestsRef = useRef(new Set());
   const liveResponseRef = useRef(false);
+  const statusRef = useRef("ready");
+  const messagesRef = useRef([]);
   const saveMessagesRef = useRef(chatHistory.saveMessages);
   saveMessagesRef.current = chatHistory.saveMessages;
-  const transport = useMemo(() => new DefaultChatTransport({ api: "/api/chat" }), []);
+  const transport = useMemo(() => new DefaultChatTransport({ api: "/api/chat/" }), []);
   const { messages, setMessages, sendMessage, regenerate, status, error, clearError } = useChat({ transport });
+  statusRef.current = status;
+  messagesRef.current = messages;
 
   useEffect(() => {
     if (!chatHistory.hydrated) return;
     if (!chatHistory.activeChatId) {
       loadedChatRef.current = null;
+      setMessages([]);
       return;
     }
     if (loadedChatRef.current === chatHistory.activeChatId) return;
@@ -68,7 +75,7 @@ export function ChatLayout() {
       !hasAssistantResponse
     ) return;
     titleRequestsRef.current.add(chat.id);
-    fetch("/api/chat-title", {
+    fetch("/api/chat-title/", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ messages }),
@@ -78,7 +85,7 @@ export function ChatLayout() {
       .catch(() => {});
   }, [activeChatId, hydrated, history, messages, renameChat, status]);
 
-  function submitMessage(value = input) {
+  async function submitMessage(value = input) {
     const trimmed = value.trim();
     if ((!trimmed && !files.length) || status === "submitted" || status === "streaming") return;
     const chatId = activeChatId || globalThis.crypto?.randomUUID?.() || `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
@@ -87,9 +94,16 @@ export function ChatLayout() {
       chatHistory.setActiveChatId(chatId);
     }
     liveResponseRef.current = true;
-    sendMessage({ text: trimmed, files }, { body: { chatId } });
-    setInput("");
-    setFiles([]);
+    try {
+      const transfer = new DataTransfer();
+      files.slice(0, MAX_CHAT_FILES).forEach((file) => transfer.items.add(file));
+      const fileParts = await convertFileListToFileUIParts(transfer.files);
+      await sendMessage(trimmed ? { text: trimmed, files: fileParts } : { files: fileParts }, { body: { chatId } });
+      setInput("");
+      setFiles([]);
+    } catch {
+      liveResponseRef.current = false;
+    }
   }
 
   useEffect(() => {
@@ -97,13 +111,13 @@ export function ChatLayout() {
     let socket;
     let disposed = false;
     const refreshFromServer = async () => {
-      if (disposed || status === "submitted" || status === "streaming") return;
+      if (disposed || statusRef.current === "submitted" || statusRef.current === "streaming") return;
       try {
-        const response = await fetch("/api/chats");
+        const response = await fetch("/api/chats/");
         if (!response.ok) return;
         const result = await response.json();
         const serverChat = (result.chats || []).find((chat) => chat.id === activeChatId);
-        if (serverChat?.messages?.length > messages.length) setMessages(serverChat.messages);
+        if (serverChat?.messages?.length > messagesRef.current.length) setMessages(serverChat.messages);
       } catch {
         // The regular chat persistence path remains the source of truth when realtime is unavailable.
       }
@@ -127,7 +141,7 @@ export function ChatLayout() {
       socket?.close();
       window.clearInterval(interval);
     };
-  }, [activeChatId, messages.length, setMessages, status]);
+  }, [activeChatId, setMessages]);
 
   function retry() {
     clearError();
@@ -192,13 +206,11 @@ export function ChatLayout() {
       canvas.height = settings.height || video.videoHeight;
       if (!canvas.width || !canvas.height) throw new Error("screenshot-size-missing");
       canvas.getContext("2d").drawImage(video, 0, 0, canvas.width, canvas.height);
-      const blob = await new Promise((resolve) => canvas.toBlob(resolve, "image/png"));
-      if (!blob) throw new Error("screenshot-empty");
       const timestamp = new Date().toISOString().replace(/[:.]/g, "-").slice(0, 19);
-      captureScreenshot(new File([blob], `screenshot-${timestamp}.png`, { type: "image/png" }));
+      captureScreenshot(await canvasToJpegFile(canvas, `screenshot-${timestamp}.jpg`));
     } catch (error) {
       if (error?.name !== "NotAllowedError" && error?.name !== "AbortError") {
-        setScreenshotError("گرفتن تصویر از منبع انتخاب‌شده ممکن نشد. دوباره تلاش کنید.");
+        setScreenshotError(error?.message === "screenshot-too-large" ? "تصویر بزرگ‌تر از حد مجاز است؛ محدوده کوچک‌تری انتخاب کنید." : "گرفتن تصویر از منبع انتخاب‌شده ممکن نشد. دوباره تلاش کنید.");
       }
     } finally {
       stream?.getTracks().forEach((track) => track.stop());

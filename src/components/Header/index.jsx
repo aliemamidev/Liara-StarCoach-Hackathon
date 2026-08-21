@@ -58,7 +58,7 @@ const Header = ({ setShowSidebar }) => {
       osVersion: userAgent.getOS().version,
     };
 
-    return fetch(`/api/docs-search?q=${encodeURIComponent(value)}`)
+    return fetch(`/api/docs-search/?q=${encodeURIComponent(value)}`)
       .then((response) => (response.ok ? response.json() : { hits: [] }))
       .then((res) => {
         setResults(res.hits || []);

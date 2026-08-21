@@ -24,7 +24,7 @@ export function BrainPage() {
     setLoading(true);
     setError("");
     try {
-      const response = await fetch(`/api/admin/brain?q=${encodeURIComponent(query)}&status=${status}`);
+      const response = await fetch(`/api/admin/brain/?q=${encodeURIComponent(query)}&status=${status}`);
       if (!response.ok) throw new Error("brain-unavailable");
       setItems((await response.json()).items || []);
     } catch {
@@ -52,7 +52,7 @@ export function BrainPage() {
     setSaving(true);
     try {
       const editing = Boolean(form.id);
-      const response = await fetch(editing ? `/api/admin/brain/${form.id}` : "/api/admin/brain", {
+      const response = await fetch(editing ? `/api/admin/brain/${form.id}/` : "/api/admin/brain/", {
         method: editing ? "PATCH" : "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ question: form.question, answer: form.answer, tags: form.tags.split(",").map((tag) => tag.trim()).filter(Boolean), isActive: form.isActive }),
@@ -68,13 +68,13 @@ export function BrainPage() {
   }
 
   async function toggle(item) {
-    await fetch(`/api/admin/brain/${item.id}`, { method: "PATCH", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ isActive: !item.isActive }) });
+    await fetch(`/api/admin/brain/${item.id}/`, { method: "PATCH", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ isActive: !item.isActive }) });
     load();
   }
 
   async function softDelete(item) {
     if (!window.confirm("این مورد غیرفعال شود؟")) return;
-    await fetch(`/api/admin/brain/${item.id}`, { method: "DELETE" });
+    await fetch(`/api/admin/brain/${item.id}/`, { method: "DELETE" });
     load();
   }
 

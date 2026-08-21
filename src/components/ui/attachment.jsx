@@ -1,4 +1,5 @@
 import { FileText, Image as ImageIcon, X } from "lucide-react";
+import Image from "next/image";
 import { useEffect, useState } from "react";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
@@ -29,21 +30,19 @@ export function AttachmentPreview({ file, onRemove }) {
   return (
     <div className="chat-attachment-chip">
       {previewUrl ? (
-        <img src={previewUrl} alt="" className="chat-attachment-image" />
+        <Image unoptimized width={28} height={28} src={previewUrl} alt="" className="chat-attachment-image" />
       ) : isImage ? (
         <ImageIcon size={16} aria-hidden="true" />
       ) : (
         <FileText size={16} aria-hidden="true" />
       )}
       <span className="max-w-40 truncate" title={file.name}>{file.name}</span>
-      <Button type="button" variant="ghost" size="icon" className="h-6 w-6 rounded-full" onClick={onRemove} aria-label={`حذف ${file.name}`}>
+      <Button type="button" variant="ghost" size="icon" className="h-11 w-11 shrink-0 rounded-full" onClick={onRemove} aria-label={`حذف ${file.name}`}>
         <X size={14} aria-hidden="true" />
       </Button>
     </div>
   );
 }
-
-
 
 
 

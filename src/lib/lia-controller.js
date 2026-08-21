@@ -39,6 +39,7 @@ export const AI_UNAVAILABLE_MESSAGE = `## پاسخ
 سرویس پاسخ‌گویی هوش مصنوعی موقتاً در دسترس نیست. لطفاً کمی بعد دوباره تلاش کنید.`;
 
 export const OUT_OF_SCOPE_MESSAGE = "من فقط دربارهٔ سرویس‌های لیارا و مفاهیم فنی مرتبط کمک می‌کنم. اگر سؤال فنی یا مربوط به لیارا داری، خوشحال می‌شم راهنماییت کنم.";
+export const GREETING_MESSAGE = "## پاسخ\n\nسلام! من لیا هستم. دربارهٔ سرویس‌ها و مستندات لیارا کمکت می‌کنم.";
 
 export const PROBABLE_FALLBACK_NOTICE = `## پاسخ احتمالی و غیرمستند
 
@@ -79,13 +80,15 @@ function scoreHit(hit, queryTokens) {
 function isStrongEvidence(hits, query) {
   const queryTokens = [...new Set(tokens(query))];
   if (!queryTokens.length) return false;
-  const requiredCoverage = Math.min(2, queryTokens.length);
+  const requiredCoverage = Math.max(1, Math.ceil(queryTokens.length * 0.5));
   const normalizedQuery = normalizeText(query).toLocaleLowerCase("fa");
   return hits.some((hit) => {
     const title = normalizeText(hit.title).toLocaleLowerCase("fa");
     const coverage = hitCoverage(hit, queryTokens);
+    const structuralText = normalizeText(`${hit.title || ""} ${hit.section || ""} ${hit.path || ""}`).toLocaleLowerCase("fa");
+    const structuralMatch = queryTokens.some((token) => structuralText.includes(token));
     const titleMatch = normalizedQuery.length > 1 && title.includes(normalizedQuery);
-    return scoreHit(hit, queryTokens) >= 1.5 || (coverage >= requiredCoverage && (queryTokens.length > 1 || titleMatch));
+    return structuralMatch && (scoreHit(hit, queryTokens) >= 1.5 || (coverage >= requiredCoverage && (queryTokens.length > 1 || titleMatch)));
   });
 }
 
@@ -106,6 +109,10 @@ function previousStage(messages) {
 
 function allUserText(messages) {
   return messages.filter((message) => message.role === "user").map((message) => latestUserText([message])).filter(Boolean).join(" ");
+}
+
+export function isGreeting(query) {
+  return /^(?:سلام|درود|hello|hi|hey|کمک|کمکم\s*کن|help|راهنمایی(?:\s*می‌?خوام)?)[!؟.\s]*$/iu.test(normalizeText(query));
 }
 
 function hasImageAttachment(messages) {
@@ -156,14 +163,14 @@ function hasGoal(query) {
 }
 
 function hasEnvironment(query) {
-  return /(?:نسخه|version|runtime|production|prod|development|dev|محیط|مرورگر|browser|ویندوز|لینوکس|macos|سیستم‌?عامل|سرور|vps|کانتینر|docker)/iu.test(query);
+  return /(?:نسخه|version|runtime|production|prod|development|dev|محیط|مرورگر|browser|ویندوز|windows(?:\s*\d+)?|chrome|firefox|edge|safari|android|ios|لینوکس|linux|macos|سیستم‌?عامل|سرور|vps|کانتینر|docker|settings|تنظیمات)/iu.test(query);
 }
 
 function hasErrorDescription(query) {
   return /(?:خطا|ارور|error|status\s*\d{3}|\b\d{3}\b|پیام|کار نمی|نمی\s*(?:شود|کند)|صفحه سفید|صفحه سیاه|رفتار)/iu.test(query);
 }
 
-function clarificationQuestions(query) {
+export function clarificationQuestions(query) {
   const questions = [];
   if (!detectedService(query)) questions.push("مشکل مربوط به کدام سرویس یا بخش لیارا است؟");
   if (!hasGoal(query)) questions.push("می‌خواهید دقیقاً چه کاری انجام دهید یا به چه نتیجه‌ای برسید؟");
@@ -195,12 +202,17 @@ export async function createLiaControllerPlan(messages, settings = {}) {
   const priorStage = previousStage(messages);
   const conversation = allUserText(messages);
   const retrievalQuery = `${conversation} ${query}`.trim();
+  const contextQuery = normalizeText(`${conversation} ${query}`);
 
-  if (!isLikelyInScope(query)) {
+  if (isGreeting(query)) {
+    return { mode: LIA_STAGES.ANSWER, stage: LIA_STAGES.ANSWER, query, hits: [], brainHits: [], searchTrace: ["greeting"], metadata: { staticAnswer: GREETING_MESSAGE } };
+  }
+
+  if (!isLikelyInScope(contextQuery)) {
     return { mode: LIA_STAGES.OUT_OF_SCOPE, stage: LIA_STAGES.OUT_OF_SCOPE, query, hits: [] };
   }
 
-  const generalTechnical = isGeneralTechnicalQuery(query);
+  const generalTechnical = isGeneralTechnicalQuery(contextQuery);
   const hasImage = hasImageAttachment(messages);
   if (!understandingComplete(query, conversation) && !generalTechnical) {
     const visualRequired = needsVisualDiagnosis(`${conversation} ${query}`) && !hasImage;
@@ -221,7 +233,7 @@ export async function createLiaControllerPlan(messages, settings = {}) {
       query,
       hits: [],
       searchTrace: [],
-      message: buildClarification(query),
+      message: buildClarification(contextQuery),
     };
   }
 

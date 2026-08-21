@@ -27,7 +27,7 @@ export function ChatSettings({ open, onOpenChange, soundEnabled, onSoundChange, 
   useEffect(() => {
     if (!open) return;
     const controller = new AbortController();
-    fetch("/api/chat-config", { signal: controller.signal })
+    fetch("/api/chat-config/", { signal: controller.signal })
       .then((response) => response.json())
       .then(setConfig)
       .catch(() => setConfig({ configured: false }));
@@ -56,6 +56,7 @@ export function ChatSettings({ open, onOpenChange, soundEnabled, onSoundChange, 
                   key={value}
                   variant={mounted && theme === value ? "default" : "outline"}
                   className="h-auto flex-col gap-2 py-3"
+                  aria-pressed={mounted && theme === value}
                   onClick={() => selectTheme(value)}
                 >
                   <Icon size={17} aria-hidden="true" />
@@ -92,24 +93,12 @@ export function ChatSettings({ open, onOpenChange, soundEnabled, onSoundChange, 
             <p className="chat-setting-description mt-2">
               {config?.configured ? "اتصال سرور آماده است." : "کلید اتصال در تنظیمات سرور وارد نشده است."}
             </p>
-            <dl className="mt-4 space-y-3 text-xs">
-              <div>
-                <dt className="text-[hsl(var(--chat-muted))]">نشانی سرویس</dt>
-                <dd className="mt-1 break-all font-mono text-left" dir="ltr">{config?.baseUrl || "در حال بررسی"}</dd>
-              </div>
-              <div>
-                <dt className="text-[hsl(var(--chat-muted))]">مدل</dt>
-                <dd className="mt-1 font-mono text-left" dir="ltr">{config?.model || "در حال بررسی"}</dd>
-              </div>
-            </dl>
           </section>
         </div>
       </SheetContent>
     </Sheet>
   );
 }
-
-
 
 
 

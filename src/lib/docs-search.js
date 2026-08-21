@@ -2,10 +2,10 @@ import fs from "node:fs/promises";
 import path from "node:path";
 import MeiliSearch from "meilisearch";
 
-const MAX_RESULTS = 8;
+const MAX_RESULTS = 4;
 const MAX_BODY_LENGTH = 4200;
 const CHUNK_LENGTH = 2200;
-const DOCUMENTATION_ROOTS = ["public/llms", "src/pages"];
+const DOCUMENTATION_ROOTS = ["public/llms"];
 const ONLINE_INDEX = "docs";
 const DATABASE_QUERY_PATTERN = /(?:دیتابیس|پایگاه\s+داده|database|postgres(?:ql)?|mysql|mariadb|mongodb|mongo|redis|rabbitmq|elasticsearch|elastic\s*search|mssql|sql\s*server|sqlite|بکاپ|backup|بازیابی|restore|connection\s*pool|اتصال\s+به\s+(?:دیتابیس|پایگاه))/iu;
 let documentsPromise;
@@ -22,6 +22,23 @@ function normalizeText(value) {
 
 function tokens(value) {
   return normalizeText(value).toLocaleLowerCase("fa").match(/[\p{L}\p{N}]+/gu) || [];
+}
+
+const QUERY_SYNONYMS = [
+  [/\bdeploy(?:ment)?\b|استقرار|دیپلوی/iu, "deploy deployment استقرار دیپلوی"],
+  [/\bnode(?:\.js)?\b|نود/iu, "node nodejs node.js نود"],
+  [/\bplan\b|پلن|قیمت/iu, "plan pricing price پلن قیمت"],
+  [/database|postgres(?:ql)?|mysql|mongodb|redis|دیتابیس|پایگاه\s+داده/iu, "database دیتابیس پایگاه داده postgres postgresql mysql mongodb redis"],
+];
+
+function tokenVariants(token) {
+  const match = QUERY_SYNONYMS.find(([pattern, value]) => pattern.test(token));
+  return match ? tokens(match[1]) : [token];
+}
+
+function matchesToken(token, values) {
+  const valueSet = values instanceof Set ? values : new Set(values);
+  return tokenVariants(token).some((variant) => valueSet.has(variant));
 }
 
 async function findFiles(directory) {
@@ -116,6 +133,7 @@ async function loadDocuments() {
         titleTokens: tokens(title),
         sectionTokens: tokens(chunk.section),
         bodyTokens: new Set(tokens(body)),
+        pathTokens: tokens(relativePath),
       });
     }
   }
@@ -124,32 +142,39 @@ async function loadDocuments() {
 
 function scoreDocument(document, query, queryTokens) {
   const normalizedQuery = normalizeText(query).toLocaleLowerCase("fa");
-  const matchingTokens = queryTokens.filter((token) => document.bodyTokens.has(token));
-  const titleMatches = queryTokens.filter((token) => document.titleTokens.includes(token)).length;
-  const sectionMatches = queryTokens.filter((token) => document.sectionTokens.includes(token)).length;
+  const matchingTokens = queryTokens.filter((token) => matchesToken(token, document.bodyTokens));
+  const titleMatches = queryTokens.filter((token) => matchesToken(token, document.titleTokens)).length;
+  const sectionMatches = queryTokens.filter((token) => matchesToken(token, document.sectionTokens)).length;
+  const pathMatches = queryTokens.filter((token) => matchesToken(token, document.pathTokens)).length;
+  const structuralMatches = titleMatches + sectionMatches + pathMatches;
   let score = matchingTokens.length / Math.max(queryTokens.length, 1);
   if (document.title.toLocaleLowerCase("fa").includes(normalizedQuery)) score += 3;
   if (document.section.toLocaleLowerCase("fa").includes(normalizedQuery)) score += 1.5;
   if (document.body.toLocaleLowerCase("fa").includes(normalizedQuery)) score += 1.5;
-  score += titleMatches * 0.45 + sectionMatches * 0.3;
+  score += titleMatches * 1.8 + sectionMatches * 1.4 + pathMatches * 0.9;
   score += documentationDomainBoost(document.path, query);
-  return { document, score, coverage: matchingTokens.length };
+  return { document, score, coverage: matchingTokens.length, structuralMatches };
 }
 
 function documentationDomainBoost(relativePath, query) {
-  if (!DATABASE_QUERY_PATTERN.test(query)) return 0;
   const normalizedPath = String(relativePath || "").replaceAll("\\", "/").toLowerCase();
-  if (normalizedPath.includes("/dbaas/")) return 2.5;
-  if (normalizedPath.includes("/references/cli/") && normalizedPath.includes("db")) return 1.75;
-  if (normalizedPath.includes("/paas/") && normalizedPath.includes("connect-to-db")) return 1.25;
-  if (normalizedPath.includes("/iaas/") && normalizedPath.includes("deploy-db")) return 0.75;
-  return 0;
+  let boost = 0;
+  if (/(?:\bnode(?:\.js)?\b|نود)/iu.test(query)) {
+    if (normalizedPath.includes("/nodejs/")) boost += 5;
+    else if (normalizedPath.includes("/docker/")) boost -= 1;
+  }
+  if (!DATABASE_QUERY_PATTERN.test(query)) return boost;
+  if (normalizedPath.includes("/dbaas/")) return boost + 2.5;
+  if (normalizedPath.includes("/references/cli/") && normalizedPath.includes("db")) return boost + 1.75;
+  if (normalizedPath.includes("/paas/") && normalizedPath.includes("connect-to-db")) return boost + 1.25;
+  if (normalizedPath.includes("/iaas/") && normalizedPath.includes("deploy-db")) return boost + 0.75;
+  return boost;
 }
 
 function expandQuery(query) {
   const normalizedQuery = normalizeText(query);
-  if (!DATABASE_QUERY_PATTERN.test(normalizedQuery)) return normalizedQuery;
-  return `${normalizedQuery} دیتابیس پایگاه داده dbaas database`;
+  const synonyms = QUERY_SYNONYMS.filter(([pattern]) => pattern.test(normalizedQuery)).map(([, value]) => value);
+  return `${normalizedQuery} ${synonyms.join(" ")}`.trim();
 }
 
 export async function searchDocumentation(query) {
@@ -157,19 +182,18 @@ export async function searchDocumentation(query) {
   try {
     documentsPromise ||= loadDocuments();
     const documents = await documentsPromise;
-    const expandedQuery = expandQuery(query);
-    const queryTokens = [...new Set(tokens(expandedQuery))];
+    const queryTokens = [...new Set(tokens(normalizeText(query)))];
     const ranked = documents
       .map((document) => scoreDocument(document, query, queryTokens))
-      .filter(({ coverage, score }) => coverage > 0 || score > 0)
+      .filter(({ coverage, structuralMatches }) => structuralMatches > 0 && coverage >= Math.max(1, Math.ceil(queryTokens.length * 0.5)))
       .sort((a, b) => b.score - a.score);
+    const bestScore = ranked[0]?.score || 0;
     const selected = [];
-    const perPath = new Map();
+    const seenUrls = new Set();
     for (const item of ranked) {
-      const count = perPath.get(item.document.path) || 0;
-      if (count >= 2) continue;
+      if (item.score < bestScore * 0.65 || seenUrls.has(item.document.url)) continue;
       selected.push(item);
-      perPath.set(item.document.path, count + 1);
+      seenUrls.add(item.document.url);
       if (selected.length >= MAX_RESULTS) break;
     }
     return {
@@ -243,9 +267,9 @@ export function toInternalDocumentationUrl(value) {
 
 export function formatDocumentationSources(hits) {
   if (!hits?.length) return "";
-  const unique = [...new Map(hits.map((hit) => [hit.url || hit.path || hit.title, hit])).values()];
+  const unique = [...new Map(hits.map((hit) => [hit.url || hit.path || hit.title, hit])).values()].slice(0, MAX_RESULTS);
   return `\n\n## منبع پاسخ\n\n📄 منابع مرتبط:\n\n${unique.map((hit) => {
     const isWeb = hit.sourceType === "WEB";
-    return `- عنوان منبع: ${hit.title}\n  - ${isWeb ? `[مشاهدهٔ منبع](${hit.url})` : `مسیر فایل: \`${hit.path}\`\n  - [مشاهده در Documentation لیارا](${toInternalDocumentationUrl(hit.url)})`}`;
+    return `- عنوان منبع: ${hit.title}\n  - ${isWeb ? `[${hit.title}](${hit.url})` : `مسیر فایل: \`${hit.path}\`\n  - [${hit.title}](${toInternalDocumentationUrl(hit.url)})`}`;
   }).join("\n")}`;
 }

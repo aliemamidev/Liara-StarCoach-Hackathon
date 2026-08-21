@@ -47,13 +47,14 @@ body {
 }
 
 .admin-auth-shell {
-  height: 100dvh;
-  max-height: 100dvh;
-  overflow: hidden;
+  min-height: 100dvh;
+  height: auto;
+  max-height: none;
+  overflow-y: auto;
 }
 
 .admin-auth-shell > div {
-  max-height: 100%;
+  max-height: none;
 }
 
 @media (max-width: 767px) {
@@ -63,7 +64,7 @@ body {
   }
 
   .admin-auth-shell .admin-login-card {
-    max-height: calc(100dvh - 2rem);
+    max-height: none;
   }
 }
 
@@ -268,6 +269,11 @@ sidebar[class*="bg-[#fbfbfb]"] .badge {
   max-height: calc(100dvh - 1rem);
   overflow-x: hidden;
   overflow-y: auto;
+}
+
+.screenshot-source-dialog[role="dialog"] {
+  width: min(560px, calc(100vw - 2rem));
+  max-width: 560px;
 }
 
 @media (max-width: 639px) {

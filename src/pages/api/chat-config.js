@@ -7,9 +7,5 @@ export default function handler(req, res) {
   }
 
   const config = getAiConfig();
-  return res.status(200).json({
-    configured: isAiConfigured(config),
-    baseUrl: config.baseUrl,
-    model: config.model,
-  });
+  return res.status(200).json({ configured: isAiConfigured(config) });
 }

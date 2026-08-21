@@ -1,3 +1,4 @@
+import React from "react";
 import * as DialogPrimitive from "@radix-ui/react-dialog";
 import { X } from "lucide-react";
 import { cn } from "@/lib/utils";
@@ -10,20 +11,23 @@ export function DialogPortal({ children }) {
   return <DialogPrimitive.Portal>{children}</DialogPrimitive.Portal>;
 }
 
-export function DialogOverlay({ className, ...props }) {
+export const DialogOverlay = React.forwardRef(({ className, ...props }, ref) => {
   return (
     <DialogPrimitive.Overlay
+      ref={ref}
       className={cn("fixed inset-0 z-50 bg-black/45 backdrop-blur-[2px]", className)}
       {...props}
     />
   );
-}
+});
+DialogOverlay.displayName = DialogPrimitive.Overlay.displayName || "DialogOverlay";
 
-export function DialogContent({ className, children, ...props }) {
+export const DialogContent = React.forwardRef(({ className, children, ...props }, ref) => {
   return (
     <DialogPortal>
       <DialogOverlay />
       <DialogPrimitive.Content
+        ref={ref}
         className={cn(
           "fixed left-1/2 top-1/2 z-50 w-[calc(100%-2rem)] max-w-lg -translate-x-1/2 -translate-y-1/2 rounded-2xl border border-[hsl(var(--chat-border))] bg-[hsl(var(--chat-bg))] p-6 text-[hsl(var(--chat-text))] shadow-2xl",
           className,
@@ -38,7 +42,8 @@ export function DialogContent({ className, children, ...props }) {
       </DialogPrimitive.Content>
     </DialogPortal>
   );
-}
+});
+DialogContent.displayName = DialogPrimitive.Content.displayName || "DialogContent";
 
 export const DialogHeader = ({ className, ...props }) => (
   <div className={cn("flex flex-col gap-2 text-right", className)} {...props} />
@@ -49,7 +54,6 @@ export const DialogTitle = ({ className, ...props }) => (
 export const DialogDescription = ({ className, ...props }) => (
   <DialogPrimitive.Description className={cn("text-sm leading-6 text-[hsl(var(--chat-muted))]", className)} {...props} />
 );
-
 
 
 

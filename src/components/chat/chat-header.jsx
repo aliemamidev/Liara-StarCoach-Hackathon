@@ -1,6 +1,7 @@
 
 import { useEffect, useState } from "react";
 import Link from "next/link";
+import Image from "next/image";
 import { BookOpen, History, Moon, Settings2, Sun } from "lucide-react";
 import { useTheme } from "next-themes";
 import { Button } from "@/components/ui/button";
@@ -23,9 +24,11 @@ export function ChatHeader({ onOpenSettings, onOpenHistory }) {
   return (
     <header className="chat-header">
       <div className="flex items-center gap-3">
-        <img
+        <Image
           src="/static/logo.svg"
           alt="نشان لیارا"
+          width={84}
+          height={36}
           className="h-9 w-auto"
         />
         <div>
@@ -42,6 +45,7 @@ export function ChatHeader({ onOpenSettings, onOpenHistory }) {
                 size="icon"
                 className="chat-header-action"
                 aria-label={isDark ? "فعال‌کردن حالت روشن" : "فعال‌کردن حالت تاریک"}
+                aria-pressed={isDark}
                 onClick={() => setTheme(isDark ? "light" : "dark")}
               >
                 {isDark ? <Sun size={19} aria-hidden="true" /> : <Moon size={19} aria-hidden="true" />}

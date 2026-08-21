@@ -11,6 +11,7 @@ import {
   TooltipProvider,
   TooltipTrigger,
 } from "@/components/ui/tooltip";
+import { MAX_CHAT_FILES, validateSelectedFile } from "@/lib/chat-message-validation.mjs";
 
 const VOICE_BAR_GAINS = [0.7, 0.95, 1.15, 0.84, 1.3, 1, 0.76, 1.18, 0.9, 1.24, 0.8, 1.05, 0.68];
 
@@ -28,6 +29,7 @@ export function ChatComposer({ value, onChange, files, onFilesChange, onSubmit, 
   const [voiceError, setVoiceError] = useState("");
   const [interimTranscript, setInterimTranscript] = useState("");
   const [voiceLevel, setVoiceLevel] = useState(0);
+  const [fileError, setFileError] = useState("");
   const isBusy = status === "submitted" || status === "streaming";
 
   useEffect(() => { valueRef.current = value; }, [value]);
@@ -170,7 +172,12 @@ export function ChatComposer({ value, onChange, files, onFilesChange, onSubmit, 
 
   function handleFiles(event) {
     const selected = Array.from(event.target.files || []);
-    if (selected.length) onFilesChange([...files, ...selected]);
+    const valid = selected.filter(validateSelectedFile);
+    const available = Math.max(0, MAX_CHAT_FILES - files.length);
+    if (selected.some((file) => !validateSelectedFile(file))) setFileError("فقط فایل‌های تصویر، متن یا JSON تا حجم ۴ مگابایت پذیرفته می‌شوند.");
+    else if (selected.length > available) setFileError("حداکثر ۴ فایل را می‌توانید هم‌زمان ارسال کنید.");
+    else setFileError("");
+    if (valid.length) onFilesChange([...files, ...valid.slice(0, available)]);
     event.target.value = "";
   }
 
@@ -182,7 +189,7 @@ export function ChatComposer({ value, onChange, files, onFilesChange, onSubmit, 
           type="file"
           className="sr-only"
           multiple
-          accept="text/*,application/json,image/*,*/*"
+          accept="text/*,application/json,image/*"
           onChange={handleFiles}
           disabled={isBusy}
         />
@@ -266,12 +273,11 @@ export function ChatComposer({ value, onChange, files, onFilesChange, onSubmit, 
             </Button>
           </div>
         </div>
-        {(voiceError || screenshotError) && <p className="chat-composer-error" role="status">{voiceError || screenshotError}</p>}
+        {(fileError || voiceError || screenshotError) && <p className="chat-composer-error" role="status">{fileError || voiceError || screenshotError}</p>}
       </div>
       <p className="chat-composer-hint">با فشردن Enter ارسال می‌شود؛ برای خط جدید Shift + Enter را بزنید.</p>
     </div>
   );
 }
-
 
 

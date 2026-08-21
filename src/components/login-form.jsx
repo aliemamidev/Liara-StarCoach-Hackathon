@@ -55,7 +55,7 @@ export function LoginForm({ className, ...props }) {
     setLoading(true);
     sound.playSound("loading");
     try {
-      const response = await fetch("/api/auth/login", {
+      const response = await fetch("/api/auth/login/", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(values),
@@ -87,7 +87,7 @@ export function LoginForm({ className, ...props }) {
           <form className="order-2 flex items-center p-7 sm:p-10 md:order-2 lg:p-14" onSubmit={submit} noValidate>
             <div className="w-full">
               <div className="mb-10 flex items-center justify-between md:hidden">
-                <Image src="/static/logo.svg" alt="لیارا" width={91} height={40} priority className="h-10 w-auto" />
+                <Image src="/static/logo.svg" alt="لیارا" width={91} height={40} className="h-10 w-auto" />
               </div>
               <div className="text-right">
                 <h1 className="text-[28px] font-black tracking-tight text-[hsl(var(--site-text))] sm:text-3xl">ورود به پنل مدیریت</h1>
@@ -125,10 +125,10 @@ export function LoginForm({ className, ...props }) {
           </form>
 
           <div className="login-visual order-1 relative hidden min-h-0 overflow-hidden bg-[hsl(var(--site-brand-surface))] md:order-1 md:block">
-            <Image src="/static/images/liara-admin-login-visual.png" alt="زیرساخت ابری و سرویس‌های لیارا" fill priority sizes="(max-width: 1024px) 50vw, 560px" className="object-cover object-center" />
+            <Image src="/static/images/liara-admin-login-visual.png" alt="زیرساخت ابری و سرویس‌های لیارا" fill sizes="(max-width: 1024px) 50vw, 560px" className="object-cover object-center" />
             <div className="absolute inset-0 bg-gradient-to-b from-[hsl(var(--site-brand-surface)/.12)] via-transparent to-[hsl(var(--site-brand-surface)/.28)]" aria-hidden="true" />
             <div className="absolute inset-x-8 top-8 flex items-center justify-between">
-              <Image src="/static/logo.svg" alt="لیارا" width={91} height={40} priority className="h-10 w-auto" />
+              <Image src="/static/logo.svg" alt="لیارا" width={91} height={40} className="h-10 w-auto" />
             </div>
           </div>
         </CardContent>

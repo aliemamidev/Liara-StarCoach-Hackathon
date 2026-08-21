@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from "react";
+import { MAX_DATA_URL_LENGTH } from "@/lib/chat-message-validation.mjs";
 
 const STORAGE_KEY = "liara-chat-history-v1";
 const ACTIVE_KEY = "liara-chat-active-v1";
@@ -28,7 +29,7 @@ function serializeMessages(messages) {
       if (part?.type === "text") return [{ type: "text", text: part.text || "" }];
       if (part?.type !== "file") return [];
       const base = { type: "file", filename: part.filename || "فایل پیوست", mediaType: part.mediaType || "application/octet-stream" };
-      return typeof part.url === "string" && part.url.startsWith("data:") && part.url.length <= 4 * 1024 * 1024
+      return typeof part.url === "string" && part.url.startsWith("data:") && part.url.length <= MAX_DATA_URL_LENGTH
         ? [{ ...base, url: part.url }]
         : [base];
     }),
@@ -60,7 +61,7 @@ export function useChatHistory() {
     saveQueueRef.current = saveQueueRef.current
       .catch(() => {})
       .then(async () => {
-        const response = await fetch("/api/chats", {
+        const response = await fetch("/api/chats/", {
           method,
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify(body),
@@ -75,7 +76,7 @@ export function useChatHistory() {
   useEffect(() => {
     const load = async () => {
       try {
-        const response = await fetch("/api/chats");
+        const response = await fetch("/api/chats/");
         if (!response.ok) throw new Error("chat-api-unavailable");
         const result = await response.json();
         const nextHistory = parseHistory(JSON.stringify(result.chats || []));

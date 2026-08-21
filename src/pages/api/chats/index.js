@@ -2,6 +2,7 @@ import { randomUUID } from "node:crypto";
 import { prisma } from "@/lib/prisma";
 import { getChatOwner } from "@/lib/chat-owner";
 import { publishRealtime } from "@/lib/realtime.mjs";
+import { validateChatMessages } from "@/lib/chat-message-validation.mjs";
 
 function cleanMessage(message) {
   return {
@@ -11,6 +12,10 @@ function cleanMessage(message) {
     ...(Number.isFinite(Number(message?.createdAt)) ? { createdAt: Number(message.createdAt) } : {}),
     ...(message?.metadata && typeof message.metadata === "object" ? { metadata: message.metadata } : {}),
   };
+}
+
+function validChat(chat) {
+  return chat && typeof chat.title === "string" && Array.isArray(chat.messages) && validateChatMessages(chat.messages);
 }
 
 function cleanChat(chat) {
@@ -59,6 +64,7 @@ export default async function handler(req, res) {
     }
 
     const chat = cleanChat(req.body?.chat);
+    if (!validChat(chat)) return res.status(400).json({ message: "ساختار گفتگو معتبر نیست." });
     const data = {
       title: chat.title,
       titleGenerated: chat.titleGenerated,

@@ -91,7 +91,7 @@ export function ChatActions({ content, onRetry, playSound }) {
     try {
       for (const chunk of splitSpeech(content)) {
         if (speechRequestRef.current !== requestId) return;
-        const response = await fetch("/api/chat-speech", {
+        const response = await fetch("/api/chat-speech/", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({ text: chunk }),
