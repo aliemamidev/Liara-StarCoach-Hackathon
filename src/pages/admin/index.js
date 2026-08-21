@@ -23,7 +23,7 @@ export async function getServerSideProps({ req, res }) {
             phone: session.user.phone,
             name: session.user.name,
             role: session.user.role,
-            lastLoginAt: session.user.lastLoginAt,
+            lastLoginAt: session.user.lastLoginAt ? session.user.lastLoginAt.toISOString() : null,
           },
         },
       },
