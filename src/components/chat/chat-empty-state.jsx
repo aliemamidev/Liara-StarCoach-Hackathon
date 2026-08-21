@@ -13,7 +13,7 @@ export function ChatEmptyState({ onSuggestion }) {
         <Sparkles size={20} />
       </div>
       <h1 id="chat-empty-title">سلام، من لیا هستم</h1>
-      <p>پرسش فنی‌ات دربارهٔ محصولات و سرویس‌های لیارا را بپرس تا بر اساس Documentation راهنمایی‌ات کنم.</p>
+      <p>پرسش فنی‌ات دربارهٔ محصولات و سرویس‌های لیارا را بپرس تا بر اساس مستندات راهنمایی‌ات کنم.</p>
       <div className="chat-suggestions">
         {suggestions.map((suggestion) => (
           <button
@@ -29,7 +29,6 @@ export function ChatEmptyState({ onSuggestion }) {
     </section>
   );
 }
-
 
 
 

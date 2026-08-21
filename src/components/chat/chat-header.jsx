@@ -12,7 +12,7 @@ import {
 } from "@/components/ui/tooltip";
 
 
-export function ChatHeader({ title, onOpenSettings, onOpenHistory }) {
+export function ChatHeader({ onOpenSettings, onOpenHistory }) {
   const { resolvedTheme, setTheme } = useTheme();
   const [mounted, setMounted] = useState(false);
 
@@ -26,11 +26,10 @@ export function ChatHeader({ title, onOpenSettings, onOpenHistory }) {
         <img
           src="/static/logo.svg"
           alt="نشان لیارا"
-          className="h-6 w-auto"
+          className="h-9 w-auto"
         />
         <div>
           <p className="text-sm font-bold text-[hsl(var(--chat-text))]">لیا، دستیار هوش مصنوعی لیارا</p>
-          <p className="chat-current-title" title={title}>{title}</p>
         </div>
       </div>
 

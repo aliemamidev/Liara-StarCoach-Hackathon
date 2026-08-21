@@ -70,7 +70,16 @@ export default async function handler(req, res) {
       ? await prisma.chat.update({ where: { id: existing.id }, data })
       : await prisma.chat.create({ data: { id: chat.id, ...data } });
     await prisma.message.deleteMany({ where: { chatId: saved.id } });
-    if (chat.messages.length) await prisma.message.createMany({ data: chat.messages.map((message) => ({ ...message, chatId: saved.id })) });
+    if (chat.messages.length) {
+      const createdAt = Date.now();
+      await prisma.message.createMany({
+        data: chat.messages.map((message, index) => ({
+          ...message,
+          chatId: saved.id,
+          createdAt: new Date(createdAt + index),
+        })),
+      });
+    }
     publishRealtime("chat.updated", { chatId: saved.id, owner: owner.userId ? "user" : "guest", messageCount: chat.messages.length });
     return res.status(200).json({ ok: true });
   } catch (error) {

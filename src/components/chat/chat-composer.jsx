@@ -153,6 +153,9 @@ export function ChatComposer({ value, onChange, files, onFilesChange, onSubmit, 
   }, []);
 
   function handleKeyDown(event) {
+    if (!event.ctrlKey && !event.altKey && !event.metaKey && (event.key.length === 1 || event.key === "Backspace")) {
+      playSound("press");
+    }
     if (event.key === "Enter" && !event.shiftKey) {
       event.preventDefault();
       submit();
@@ -269,7 +272,6 @@ export function ChatComposer({ value, onChange, files, onFilesChange, onSubmit, 
     </div>
   );
 }
-
 
 
 

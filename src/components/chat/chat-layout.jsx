@@ -82,7 +82,10 @@ export function ChatLayout() {
     const trimmed = value.trim();
     if ((!trimmed && !files.length) || status === "submitted" || status === "streaming") return;
     const chatId = activeChatId || globalThis.crypto?.randomUUID?.() || `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
-    if (!activeChatId) chatHistory.setActiveChatId(chatId);
+    if (!activeChatId) {
+      loadedChatRef.current = chatId;
+      chatHistory.setActiveChatId(chatId);
+    }
     liveResponseRef.current = true;
     sendMessage({ text: trimmed, files }, { body: { chatId } });
     setInput("");
@@ -135,6 +138,7 @@ export function ChatLayout() {
   function startNewChat() {
     titleRequestsRef.current.clear();
     liveResponseRef.current = false;
+    loadedChatRef.current = null;
     chatHistory.setActiveChatId(null);
     setMessages([]);
     setFiles([]);
@@ -146,6 +150,7 @@ export function ChatLayout() {
     const chat = chatHistory.history.find((item) => item.id === id);
     if (!chat) return;
     liveResponseRef.current = false;
+    loadedChatRef.current = id;
     chatHistory.setActiveChatId(id);
     setMessages(chat.messages);
     setFiles([]);
