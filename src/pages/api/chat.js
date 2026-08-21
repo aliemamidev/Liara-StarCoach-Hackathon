@@ -9,7 +9,7 @@ import { randomUUID } from "node:crypto";
 import { getAiConfig, isAiConfigured } from "@/lib/ai-config";
 import { formatDocumentationContext, formatDocumentationSources } from "@/lib/docs-search";
 import { formatKnowledgeContext, formatKnowledgeSources } from "@/lib/lia-brain";
-import { createOrReuseEscalation } from "@/lib/lia-escalations";
+import { CONTACT_REQUEST_MESSAGE, CONTACT_STAGE, createOrReuseEscalation, parseGuestContact } from "@/lib/lia-escalations";
 import { prisma } from "@/lib/prisma";
 import { getChatOwner } from "@/lib/chat-owner";
 import { getAdminSettings } from "@/lib/admin-settings";
@@ -94,10 +94,19 @@ const UNANSWERED_MESSAGE = `## پاسخ
 
 در منابع موجود پاسخ مطمئنی برای این سؤال پیدا نکردم. موضوع برای بررسی‌های بعدی ثبت شد.`;
 
-async function pipeEscalation(response, messages, chatId, plan) {
-  const ticket = await createOrReuseEscalation({ chatId, messages, query: plan.query, clarifiedQuestion: plan.clarifiedQuestion, plan });
+async function pipeEscalation(response, messages, chatId, plan, contact) {
+  const ticket = await createOrReuseEscalation({ chatId, messages, query: plan.query, clarifiedQuestion: plan.clarifiedQuestion, plan, contact });
   publishRealtime("escalation.created", { ticketId: ticket.id, chatId });
   return pipeStaticMessage(response, messages, ESCALATION_MESSAGE, LIA_STAGES.ESCALATED, { ticketId: ticket.id });
+}
+
+function previousAssistant(messages) { return [...messages].reverse().find((message) => message.role === "assistant"); }
+function latestUserText(messages) {
+  const message = [...messages].reverse().find((item) => item.role === "user");
+  return (message?.parts || []).filter((part) => part?.type === "text").map((part) => part.text || "").join(" ").trim();
+}
+async function pipeContactRequest(response, messages) {
+  return pipeStaticMessage(response, messages, CONTACT_REQUEST_MESSAGE, CONTACT_STAGE, { liaAction: "contact" });
 }
 
 export default async function handler(req, res) {
@@ -115,13 +124,22 @@ export default async function handler(req, res) {
     const owner = await getChatOwner(req, res);
     const chatId = await ensureChatOwnership(String(req.body?.chatId || req.body?.id || ""), owner);
     const settings = await getAdminSettings();
+    const priorAssistant = previousAssistant(messages);
+    if (!owner.userId && priorAssistant?.metadata?.liaStage === CONTACT_STAGE) {
+      const contact = parseGuestContact(latestUserText(messages));
+      if (!contact) return await pipeContactRequest(res, messages);
+      const originalPlan = await createLiaControllerPlan(messages.slice(0, -1), settings);
+      return await pipeEscalation(res, messages, chatId, originalPlan, contact);
+    }
     const plan = await createLiaControllerPlan(messages, settings);
     if (plan.mode === LIA_STAGES.OUT_OF_SCOPE) return await pipeStaticMessage(res, messages, OUT_OF_SCOPE_MESSAGE, plan.stage);
     if (plan.mode === LIA_STAGES.CLARIFICATION || plan.mode === LIA_STAGES.SCREENSHOT) {
       return await pipeStaticMessage(res, messages, plan.message, plan.stage, plan.metadata || {});
     }
     if (plan.mode === LIA_STAGES.ESCALATED) {
-      return await pipeEscalation(res, messages, chatId, plan);
+      const contact = !owner.userId ? parseGuestContact(plan.query) : null;
+      if (!owner.userId && !contact) return await pipeContactRequest(res, messages);
+      return await pipeEscalation(res, messages, chatId, plan, contact);
     }
     if (plan.mode === LIA_STAGES.UNANSWERED) {
       return await pipeStaticMessage(res, messages, UNANSWERED_MESSAGE, plan.stage, {

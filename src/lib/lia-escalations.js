@@ -5,6 +5,28 @@ import { normalizeKnowledgeText } from "@/lib/lia-brain";
 const MAX_TEXT = 5000;
 const MAX_ATTACHMENT_DATA = 4 * 1024 * 1024;
 
+export const CONTACT_REQUEST_MESSAGE = `## اطلاعات تماس لازم است
+
+برای اینکه ادمین بتواند پاسخ این درخواست را برایتان ارسال کند، لطفاً در یک پیام وارد کنید:
+
+نام و نام خانوادگی: …
+شماره موبایل: …`;
+export const CONTACT_STAGE = "awaiting_contact";
+
+function normalizeDigits(value) {
+  return String(value || "").replace(/[۰-۹]/g, (digit) => String("۰۱۲۳۴۵۶۷۸۹".indexOf(digit))).replace(/[٠-٩]/g, (digit) => String("٠١٢٣٤٥٦٧٨٩".indexOf(digit)));
+}
+
+export function parseGuestContact(text) {
+  const value = String(text || "").trim();
+  const nameMatch = value.match(/نام(?:\s*و\s*نام\s*خانوادگی)?\s*[:：-]\s*(.+?)(?=\s*(?:شماره\s*(?:موبایل|تماس)|موبایل|تلفن)\s*[:：-]|$)/iu);
+  const phoneMatch = value.match(/(?:شماره\s*(?:موبایل|تماس)|موبایل|تلفن)\s*[:：-]?\s*([+\d۰-۹٠-٩\s()-]{8,20})/iu);
+  const name = nameMatch?.[1]?.replace(/[\n،,]+$/, "").trim().slice(0, 120) || "";
+  const phone = normalizeDigits(phoneMatch?.[1] || "").replace(/[^\d+]/g, "");
+  if (!name || !/^(?:\+98|98|0)?9\d{9}$/.test(phone)) return null;
+  return { name, phone: phone.startsWith("+98") ? `0${phone.slice(3)}` : phone.startsWith("98") ? `0${phone.slice(2)}` : phone };
+}
+
 function textFromMessage(message) {
   return (message?.parts || []).filter((part) => part?.type === "text").map((part) => String(part.text || "")).join(" ").trim();
 }
@@ -40,7 +62,7 @@ export function summarizeSearchTrace(plan) {
   };
 }
 
-export async function createOrReuseEscalation({ chatId, messages, query, clarifiedQuestion, plan }) {
+export async function createOrReuseEscalation({ chatId, messages, query, clarifiedQuestion, plan, contact }) {
   const existing = await prisma.escalationTicket.findFirst({ where: { chatId, status: "PENDING" }, orderBy: { createdAt: "desc" } });
   if (existing) return existing;
   try {
@@ -52,6 +74,7 @@ export async function createOrReuseEscalation({ chatId, messages, query, clarifi
         conversationSnapshot: sanitizeConversation(messages),
         attachmentsSnapshot: sanitizeAttachments(messages),
         searchTrace: summarizeSearchTrace(plan),
+        ...(contact ? { guestName: contact.name, guestPhone: contact.phone } : {}),
       },
     });
   } catch (error) {

@@ -124,6 +124,8 @@ model EscalationTicket {
   conversationSnapshot Json
   attachmentsSnapshot  Json
   searchTrace          Json
+  guestName            String?
+  guestPhone           String?
   status               EscalationStatus @default(PENDING)
   adminAnswer          String?
   answeredById         String?
@@ -138,4 +140,5 @@ model EscalationTicket {
   @@index([chatId, status])
   @@index([status, updatedAt])
   @@index([knowledgeEntryId])
+  @@index([guestPhone])
 }

@@ -15,6 +15,8 @@ function serialize(ticket) {
     searchTrace: ticket.searchTrace,
     status: ticket.status,
     adminAnswer: ticket.adminAnswer,
+    guestName: ticket.guestName,
+    guestPhone: ticket.guestPhone,
     createdAt: ticket.createdAt,
     updatedAt: ticket.updatedAt,
     answeredAt: ticket.answeredAt,
