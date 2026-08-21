@@ -1,6 +1,7 @@
 import Head from "next/head";
 import Image from "next/image";
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
+import { useRouter } from "next/router";
 import {
   AlertTriangle,
   ArrowDownLeft,
@@ -28,6 +29,8 @@ import {
   MessagesSquare,
   Moon,
   MoreHorizontal,
+  PanelRightClose,
+  PanelRightOpen,
   Plus,
   RotateCcw,
   Search,
@@ -48,10 +51,13 @@ import {
 import { useTheme } from "next-themes";
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuLabel, DropdownMenuSeparator, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import { Input } from "@/components/ui/input";
 import { Sheet, SheetContent } from "@/components/ui/sheet";
+import { Toast } from "@/components/ui/toast";
 import { LoginForm } from "@/components/login-form";
 import { useUiSound } from "@/hooks/use-ui-sound";
+import { playUiSound, syncSoundEnabled } from "@/lib/sound";
 import {
   activeUsers,
   adminNavItems,
@@ -62,6 +68,7 @@ import {
   topics,
   unknownTopics,
   weeklyMessages,
+  adminNotifications,
 } from "@/data/admin-dashboard";
 
 const iconMap = {
@@ -87,17 +94,11 @@ function Icon({ name, size = 18, ...props }) {
   return <Component size={size} strokeWidth={1.8} aria-hidden="true" {...props} />;
 }
 
-function Brand() {
+function Brand({ collapsed = false, onToggle }) {
   return (
-    <div className="flex items-center gap-3">
-      <div className="relative flex h-11 w-11 items-center justify-center overflow-hidden rounded-2xl bg-[#64e4d2] text-[#0e2335] shadow-[0_8px_24px_rgba(100,228,210,.2)]">
-        <Image src="/static/logo.svg" alt="لیارا" width={34} height={15} priority className="h-auto w-[34px] object-contain" />
-        <span className="absolute -bottom-3 -left-2 h-7 w-7 rounded-full border-2 border-[#142139] bg-[#f49a58]" />
-      </div>
-      <div>
-        <p className="text-[17px] font-extrabold tracking-tight text-white">لیارا</p>
-        <p className="text-[10px] font-semibold tracking-[0.16em] text-[#91a4bc]">ADMIN CONSOLE</p>
-      </div>
+    <div className={collapsed ? "flex flex-col items-center" : "flex items-center justify-between gap-3"}>
+      <Image src="/static/logo.svg" alt="لیارا" width={72} height={32} priority className={`h-auto object-contain ${collapsed ? "w-[46px]" : "w-[72px]"}`} />
+      {onToggle && <button type="button" onClick={onToggle} aria-label={collapsed ? "باز کردن سایدبار" : "بستن سایدبار"} className={`flex h-11 w-11 items-center justify-center rounded-xl text-[#8295ad] transition hover:bg-white/10 hover:text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#64e4d2] ${collapsed ? "mt-3" : ""}`}>{collapsed ? <PanelRightOpen size={21} /> : <PanelRightClose size={21} />}</button>}
     </div>
   );
 }
@@ -118,12 +119,12 @@ function StatusBadge({ status, children }) {
   return <span className={`inline-flex shrink-0 items-center gap-1.5 whitespace-nowrap rounded-full px-2.5 py-1 text-[11px] font-bold ${styles[status] || "bg-slate-100 text-slate-600"}`}><StatusIcon size={13} />{children}</span>;
 }
 
-function AdminSidebar({ activeSection, onNavigate, onLogout, user, mobile = false }) {
+function AdminSidebar({ activeSection, onNavigate, collapsed = false, onToggle, mobile = false }) {
   return (
-    <div className={`flex h-full flex-col ${mobile ? "p-5" : "px-5 py-7"}`}>
-      <Brand />
-      <div className="mt-10">
-        <p className="mb-3 px-3 text-[10px] font-bold tracking-[0.18em] text-[#71849f]">مرکز کنترل</p>
+    <div className={`flex h-full flex-col ${mobile ? "p-5" : collapsed ? "px-3 py-7" : "px-5 py-7"}`}>
+      <Brand collapsed={collapsed} onToggle={mobile ? undefined : onToggle} />
+      <div className={`${collapsed ? "mt-10" : "mt-10"}`}>
+        {!collapsed && <p className="mb-3 px-3 text-[10px] font-bold tracking-[0.18em] text-[#71849f]">مرکز کنترل</p>}
         <nav className="space-y-1.5" aria-label="ناوبری پنل ادمین">
           {adminNavItems.map((item) => {
             const active = activeSection === item.id;
@@ -132,21 +133,22 @@ function AdminSidebar({ activeSection, onNavigate, onLogout, user, mobile = fals
                 key={item.id}
                 type="button"
                 onClick={() => onNavigate(item.id)}
-                className={`group flex w-full items-center gap-3 rounded-2xl px-3 py-3 text-right transition ${active ? "bg-[#263752] text-white shadow-[inset_0_0_0_1px_rgba(149,255,238,.08)]" : "text-[#9aaac0] hover:bg-[#1c2a42] hover:text-white"}`}
+                aria-label={collapsed ? item.label : undefined}
+                className={`group flex w-full items-center rounded-2xl py-3 text-right transition ${collapsed ? "justify-center px-2" : "gap-3 px-3"} ${active ? "bg-[#263752] text-white shadow-[inset_0_0_0_1px_rgba(149,255,238,.08)]" : "text-[#9aaac0] hover:bg-[#1c2a42] hover:text-white"}`}
                 aria-current={active ? "page" : undefined}
               >
                 <span className={`flex h-9 w-9 items-center justify-center rounded-xl transition ${active ? "bg-[#64e4d2] text-[#11253a]" : "bg-[#1a2941] text-[#8195b0] group-hover:text-[#d2e1f4]"}`}><Icon name={item.icon} size={17} /></span>
-                <span className="min-w-0 flex-1">
+                {!collapsed && <span className="min-w-0 flex-1">
                   <span className="block text-[13px] font-bold">{item.label}</span>
                   <span className={`mt-0.5 block truncate text-[10px] ${active ? "text-[#a9bfd5]" : "text-[#6f829d]"}`}>{item.caption}</span>
-                </span>
-                {active && <ChevronLeft size={15} className="text-[#64e4d2]" />}
+                </span>}
+                {active && !collapsed && <ChevronLeft size={15} className="text-[#64e4d2]" />}
               </button>
             );
           })}
         </nav>
       </div>
-      <div className="mt-auto space-y-4">
+      {!collapsed && <div className="mt-auto">
         <div className="rounded-2xl border border-[#2a3b56] bg-[#17263d] p-4">
           <div className="mb-3 flex items-center justify-between">
             <span className="flex items-center gap-2 text-[11px] font-bold text-[#bdd0e5]"><span className="h-2 w-2 animate-pulse rounded-full bg-[#64e4d2]" />وضعیت سیستم</span>
@@ -155,12 +157,7 @@ function AdminSidebar({ activeSection, onNavigate, onLogout, user, mobile = fals
           <div className="h-1.5 overflow-hidden rounded-full bg-[#2b3d56]"><div className="h-full w-[96%] rounded-full bg-gradient-to-l from-[#64e4d2] to-[#4387dd]" /></div>
           <p className="mt-2 text-[10px] leading-5 text-[#7990ab]">آخرین همگام‌سازی: ۲ دقیقه پیش</p>
         </div>
-        <div className="flex items-center gap-3 border-t border-[#2a3b56] pt-4">
-          <UserAvatar initials="س‌ک" tone="teal" size="sm" />
-          <div className="min-w-0 flex-1"><p className="truncate text-[12px] font-bold text-white">{user?.name || "مدیر لیارا"}</p><p className="truncate text-[10px] text-[#8295ad]">مدیر سیستم</p></div>
-          <button type="button" onClick={onLogout} aria-label="خروج از پنل" className="flex h-11 w-11 items-center justify-center rounded-xl text-[#8295ad] transition hover:bg-white/10 hover:text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#64e4d2]"><LogOut size={16} /></button>
-        </div>
-      </div>
+      </div>}
     </div>
   );
 }
@@ -185,12 +182,13 @@ function KpiCard({ item }) {
   return <Card className="p-5"><div className="flex items-start justify-between gap-3"><span className={`flex h-10 w-10 items-center justify-center rounded-xl ${toneClasses[item.tone].icon}`}>{item.id === "messages" ? <MessagesSquare size={18} /> : item.id === "users" ? <Users size={18} /> : item.id === "unanswered" ? <CircleHelp size={18} /> : <XCircle size={18} />}</span><Sparkline values={item.trend} tone={item.tone} /></div><p className="mt-5 text-[12px] font-semibold text-[#748198]">{item.label}</p><div className="mt-1 flex items-end justify-between gap-3"><p className="text-[25px] font-extrabold tracking-tight text-[#1a2940]">{item.value}</p><span className={`mb-1 inline-flex items-center gap-0.5 text-[11px] font-bold ${positive ? "text-[#14947f]" : item.id === "failures" ? "text-[#d1545e]" : "text-[#14947f]"}`}>{item.change}{positive ? <ArrowUpLeft size={13} /> : <ArrowDownLeft size={13} />}</span></div><p className="mt-1 text-[10px] text-[#9aa6b7]">{item.note}</p></Card>;
 }
 
-function OverviewChart() {
-  const max = Math.max(...weeklyMessages.map((item) => item.value));
+function OverviewChart({ items = weeklyMessages }) {
+  const max = Math.max(...items.map((item) => item.value), 1);
   return <Card className="p-5"><div className="mb-8 flex flex-wrap items-center justify-between gap-3"><div><p className="text-[11px] font-bold text-[#8b99ab]">روند تعاملات</p><h2 className="mt-1 text-[17px] font-extrabold text-[#1a2940]">حجم پیام‌ها در هفته جاری</h2></div><button type="button" className="flex items-center gap-2 rounded-xl border border-[#e7ecf2] px-3 py-2 text-[11px] font-bold text-[#65738a]"><CalendarDays size={14} />۷ روز اخیر<ChevronDown size={14} /></button></div><div className="flex h-48 items-end gap-2 sm:gap-4"><div className="flex h-full flex-col justify-between pb-7 text-[10px] text-[#b0bac8]"><span>۱۰۰</span><span>۷۵</span><span>۵۰</span><span>۲۵</span><span>۰</span></div><div className="relative flex h-full flex-1 items-end justify-between gap-2 border-b border-[#edf0f4] pb-7 before:absolute before:inset-x-0 before:top-0 before:h-px before:bg-[#f1f3f6] before:shadow-[0_48px_0_#f1f3f6,0_96px_0_#f1f3f6,0_144px_0_#f1f3f6]">{weeklyMessages.map((item, index) => <div className="z-10 flex h-full flex-1 flex-col items-center justify-end gap-2" key={item.day}><div className={`w-full max-w-8 rounded-t-xl transition hover:opacity-80 ${index === 5 ? "bg-gradient-to-t from-[#3f72e1] to-[#70e6d4] shadow-[0_8px_18px_rgba(70,125,224,.22)]" : "bg-[#dfe8f7]"}`} style={{ height: `${(item.value / max) * 78}%` }} /><span className="absolute bottom-0 text-[10px] font-semibold text-[#9aa6b7]">{item.day}</span></div>)}</div></div></Card>;
 }
 
-function TopicsCard({ onNavigate }) {
+function TopicsCard({ onNavigate, items = topics }) {
+  const topics = items;
   return <Card className="p-5"><SectionTitle label="موضوعات پرتکرار" action="مشاهده تحلیل کامل" onAction={() => onNavigate("analytics")} /><div className="space-y-5">{topics.map((topic) => <div key={topic.label}><div className="mb-2 flex items-center justify-between text-[11px]"><span className="font-bold text-[#4f5f74]">{topic.label}</span><span className="font-extrabold text-[#1e2d43]">{topic.count}</span></div><div className="h-2 overflow-hidden rounded-full bg-[#eef2f6]"><div className={`h-full rounded-full ${toneClasses[topic.tone].line}`} style={{ width: `${topic.percentage}%` }} /></div></div>)}</div><div className="mt-7 flex items-center gap-2 rounded-2xl bg-[#f3f7fd] p-3 text-[10px] leading-5 text-[#647590]"><Zap size={15} className="shrink-0 text-[#4e79e8]" />استقرار و پایگاه داده بیش از نیمی از گفت‌وگوهای این هفته را تشکیل می‌دهند.</div></Card>;
 }
 
@@ -198,12 +196,14 @@ function SystemPulse() {
   return <Card className="overflow-hidden border-0 bg-[#14233a] p-0 text-white"><div className="relative p-5"><div className="absolute -left-8 -top-10 h-36 w-36 rounded-full bg-[#64e4d2]/10 blur-2xl" /><div className="relative flex items-start justify-between"><div><p className="text-[11px] font-bold text-[#91a8c4]">نبض سیستم</p><h2 className="mt-1 text-[18px] font-extrabold">همه‌چیز آرام است</h2></div><span className="flex h-9 w-9 items-center justify-center rounded-xl bg-[#64e4d2]/15 text-[#64e4d2]"><ShieldCheck size={19} /></span></div><div className="relative mt-6 flex items-end gap-1.5">{[18, 25, 20, 36, 28, 46, 34, 40, 27, 51, 43, 58, 45, 62, 50, 68, 52, 74].map((height, index) => <span key={index} className={`flex-1 rounded-full ${index > 14 ? "bg-[#f29a5c]" : "bg-[#64e4d2]"}`} style={{ height }} />)}</div><div className="relative mt-4 flex items-center justify-between border-t border-white/10 pt-3 text-[10px]"><span className="text-[#8ca1bb]">پایداری ۲۴ ساعت اخیر</span><span className="font-bold text-[#64e4d2]">۹۹٫۹٪</span></div></div><div className="grid grid-cols-3 border-t border-white/10 bg-white/[.03] px-5 py-4 text-center"><div><p className="text-[15px] font-extrabold">۱۲۰ms</p><p className="mt-1 text-[9px] text-[#8499b4]">تاخیر پاسخ</p></div><div className="border-x border-white/10"><p className="text-[15px] font-extrabold">۰٫۰۲٪</p><p className="mt-1 text-[9px] text-[#8499b4]">خطای API</p></div><div><p className="text-[15px] font-extrabold">۳۲</p><p className="mt-1 text-[9px] text-[#8499b4]">درخواست فعال</p></div></div></Card>;
 }
 
-function RecentMessages({ onSelect, onNavigate }) {
+function RecentMessages({ onSelect, onNavigate, items = messageRows }) {
+  const messageRows = items;
   return <Card className="p-5"><SectionTitle label="آخرین پیام‌ها" action="مشاهده همه پیام‌ها" onAction={() => onNavigate("messages")} /><div className="divide-y divide-[#eef1f5]">{messageRows.slice(0, 4).map((row) => <button type="button" key={row.id} onClick={() => onSelect(row)} className="flex w-full items-center gap-3 py-3 text-right transition first:pt-0 last:pb-0 hover:bg-[#fbfcfe]"><UserAvatar initials={row.initials} tone={row.status === "review" ? "orange" : "blue"} size="sm" /><div className="min-w-0 flex-1"><div className="flex items-center gap-2"><p className="text-[12px] font-bold text-[#293850]">{row.user}</p><span className="text-[10px] text-[#a1adbc]">{row.time}</span></div><p className="mt-1 truncate text-[11px] text-[#758298]">{row.question}</p></div><StatusBadge status={row.status}>{row.statusLabel}</StatusBadge></button>)}</div></Card>;
 }
 
-function DashboardPage({ onSelect, onNavigate }) {
-  return <div className="space-y-5"><div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">{kpis.map((item) => <KpiCard key={item.id} item={item} />)}</div><div className="grid gap-5 xl:grid-cols-[minmax(0,1.55fr)_minmax(310px,1fr)]"><OverviewChart /><TopicsCard onNavigate={onNavigate} /></div><div className="grid gap-5 xl:grid-cols-[minmax(0,1.25fr)_minmax(320px,.75fr)]"><RecentMessages onSelect={onSelect} onNavigate={onNavigate} /><SystemPulse /></div></div>;
+function DashboardPage({ onSelect, onNavigate, data }) {
+  const dashboard = data?.dashboard || { kpis, weekly: weeklyMessages, topics };
+  return <div className="space-y-5"><div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">{dashboard.kpis.map((item) => <KpiCard key={item.id} item={item} />)}</div><div className="grid gap-5 xl:grid-cols-[minmax(0,1.55fr)_minmax(310px,1fr)]"><OverviewChart items={dashboard.weekly} /><TopicsCard items={dashboard.topics} onNavigate={onNavigate} /></div><div className="grid gap-5 xl:grid-cols-[minmax(0,1.25fr)_minmax(320px,.75fr)]"><RecentMessages items={data?.messages || messageRows} onSelect={onSelect} onNavigate={onNavigate} /><SystemPulse /></div></div>;
 }
 
 function EmptyState({ title = "موردی پیدا نشد", description = "با تغییر فیلترها دوباره امتحان کنید." }) {
@@ -214,10 +214,10 @@ function FilterBar({ search, onSearch, status, onStatus }) {
   return <div className="mb-5 flex flex-col gap-3 md:flex-row md:items-center"><div className="relative min-w-0 flex-1"><Search size={16} className="absolute right-3 top-1/2 -translate-y-1/2 text-[#9aa8ba]" /><Input value={search} onChange={(event) => onSearch(event.target.value)} placeholder="جستجو در پیام‌ها، کاربران و موضوعات..." className="h-11 border-[#e4eaf1] bg-[#fbfcfe] pr-10 text-xs" /></div><div className="flex gap-2"><button type="button" onClick={() => onStatus(status === "all" ? "review" : "all")} className={`inline-flex h-11 items-center gap-2 rounded-xl border px-3 text-xs font-bold transition ${status === "review" ? "border-[#f4d3a7] bg-[#fff7eb] text-[#b86b0c]" : "border-[#e4eaf1] bg-white text-[#64738a] hover:bg-[#f7f9fc]"}`}><Filter size={15} />{status === "review" ? "نیازمند بررسی" : "همه وضعیت‌ها"}</button><button type="button" className="inline-flex h-11 items-center gap-2 rounded-xl border border-[#e4eaf1] bg-white px-3 text-xs font-bold text-[#64738a] hover:bg-[#f7f9fc]"><SlidersHorizontal size={15} />فیلتر بیشتر</button></div></div>;
 }
 
-function MessagesPage({ onSelect }) {
+function MessagesPage({ onSelect, items = messageRows }) {
   const [search, setSearch] = useState("");
   const [status, setStatus] = useState("all");
-  const filtered = useMemo(() => messageRows.filter((row) => { const haystack = `${row.user} ${row.question} ${row.topic}`.toLowerCase(); return haystack.includes(search.toLowerCase()) && (status === "all" || row.status === status); }), [search, status]);
+  const filtered = useMemo(() => items.filter((row) => { const haystack = `${row.user} ${row.question} ${row.topic}`.toLowerCase(); return haystack.includes(search.toLowerCase()) && (status === "all" || row.status === status); }), [items, search, status]);
   return <Card className="p-5"><div className="mb-5 flex flex-wrap items-center justify-between gap-3"><div><p className="text-[11px] text-[#8b99ab]">{filtered.length} از {messageRows.length} مکالمه</p><h2 className="mt-1 text-[17px] font-extrabold text-[#1a2940]">نمایش همه تعاملات</h2></div><Button variant="outline" size="sm" className="border-[#e4eaf1] text-xs"><Download size={15} />خروجی CSV</Button></div><FilterBar search={search} onSearch={setSearch} status={status} onStatus={setStatus} />{filtered.length === 0 ? <EmptyState title="پیامی با این مشخصات پیدا نشد" /> : <div className="overflow-x-auto rounded-2xl border border-[#edf0f4]"><table className="w-full min-w-[840px] text-right"><thead className="bg-[#f8fafc] text-[10px] font-bold text-[#8b99ab]"><tr><th className="px-4 py-3">کاربر</th><th className="px-4 py-3">پیام کاربر</th><th className="px-4 py-3">موضوع</th><th className="px-4 py-3">وضعیت</th><th className="px-4 py-3">زمان</th><th className="px-4 py-3" /></tr></thead><tbody className="divide-y divide-[#edf0f4]">{filtered.map((row) => <tr key={row.id} className="group transition hover:bg-[#fbfcfe]"><td className="px-4 py-4"><div className="flex items-center gap-2.5"><UserAvatar initials={row.initials} tone={row.status === "review" ? "orange" : row.status === "failed" ? "red" : "blue"} size="sm" /><div><p className="text-[11px] font-extrabold text-[#2a3a51]">{row.user}</p><p className="mt-0.5 text-[10px] text-[#9ba7b6]">{row.channel}</p></div></div></td><td className="max-w-[280px] px-4 py-4"><p className="truncate text-[11px] font-semibold text-[#536278]">{row.question}</p></td><td className="px-4 py-4"><span className="rounded-lg bg-[#f1f4f8] px-2 py-1 text-[10px] font-bold text-[#69778b]">{row.topic}</span></td><td className="px-4 py-4"><StatusBadge status={row.status}>{row.statusLabel}</StatusBadge></td><td className="whitespace-nowrap px-4 py-4 text-[10px] font-semibold text-[#9ba7b6]">{row.time}</td><td className="px-4 py-4"><button type="button" onClick={() => onSelect(row)} aria-label={`مشاهده مکالمه ${row.user}`} className="rounded-lg p-2 text-[#8d9aab] opacity-70 transition hover:bg-[#eef4fb] hover:text-[#4c72bc] group-hover:opacity-100"><Eye size={16} /></button></td></tr>)}</tbody></table></div>}</Card>;
 }
 
@@ -226,11 +226,12 @@ function UnansweredPage({ items, onResolve, onSelect }) {
 }
 
 function AnalyticsPage() {
-  const max = Math.max(...weeklyMessages.map((item) => item.value));
+  const max = Math.max(...weeklyMessages.map((item) => item.value), 1);
   return <div className="grid gap-5 xl:grid-cols-[minmax(0,1.4fr)_minmax(320px,.6fr)]"><Card className="p-5"><div className="mb-8 flex items-center justify-between"><div><p className="text-[11px] font-bold text-[#8b99ab]">روند روزانه</p><h2 className="mt-1 text-[17px] font-extrabold text-[#1a2940]">تعداد پیام‌ها و پرسش‌های بدون پاسخ</h2></div><div className="flex items-center gap-3 text-[10px] font-bold text-[#7c899a]"><span className="flex items-center gap-1.5"><i className="h-2 w-2 rounded-full bg-[#4e79e8]" />کل پیام‌ها</span><span className="flex items-center gap-1.5"><i className="h-2 w-2 rounded-full bg-[#f19a33]" />بدون پاسخ</span></div></div><div className="flex h-64 items-end gap-2 sm:gap-5">{weeklyMessages.map((item, index) => <div key={item.day} className="flex h-full flex-1 flex-col items-center justify-end gap-2"><div className="flex h-[88%] w-full items-end justify-center gap-1.5 sm:gap-2"><div className="w-1/2 max-w-8 rounded-t-lg bg-[#4e79e8]" style={{ height: `${(item.value / max) * (index === 5 ? 94 : 76)}%` }} /><div className="w-1/2 max-w-8 rounded-t-lg bg-[#f3b15d]" style={{ height: `${[42, 36, 48, 31, 39, 24, 28][index]}%` }} /></div><span className="text-[10px] font-semibold text-[#9aa6b7]">{item.day}</span></div>)}</div></Card><Card className="p-5"><SectionTitle label="مشکلات رایج کاربران" action="۳۰ روز" /><div className="space-y-5">{problemSignals.map((signal) => <div key={signal.label} className="flex items-start gap-3"><span className={`flex h-9 w-9 shrink-0 items-center justify-center rounded-xl ${toneClasses[signal.tone].icon}`}>{signal.tone === "orange" ? <AlertTriangle size={16} /> : signal.tone === "red" ? <XCircle size={16} /> : <CircleHelp size={16} />}</span><div className="min-w-0 flex-1"><div className="flex items-center justify-between gap-2"><p className="text-[11px] font-extrabold text-[#3c4b60]">{signal.label}</p><span className="text-[13px] font-extrabold text-[#28384e]">{signal.value}</span></div><p className="mt-1 text-[10px] text-[#9aa6b7]">{signal.description}</p><div className="mt-2 h-1.5 rounded-full bg-[#edf1f5]"><div className={`h-full rounded-full ${toneClasses[signal.tone].line}`} style={{ width: `${signal.progress}%` }} /></div></div></div>)}</div><div className="mt-8 rounded-2xl bg-[#f4f7fb] p-4"><p className="text-[10px] font-bold text-[#8491a3]">نرخ حل مسئله</p><p className="mt-1 text-2xl font-extrabold text-[#23344d]">۷۶٫۴٪</p><p className="mt-1 text-[10px] text-[#0e9a84]">+۵٫۱٪ نسبت به ماه قبل</p></div></Card></div>;
 }
 
-function UsersPage() {
+function UsersPage({ items = activeUsers }) {
+  const activeUsers = items;
   return <div className="space-y-5"><div className="grid gap-4 sm:grid-cols-3"><Card className="p-5"><p className="text-[11px] font-bold text-[#8b99ab]">کل کاربران</p><p className="mt-2 text-2xl font-extrabold text-[#1a2940]">۱۲٬۶۴۰</p><p className="mt-1 text-[10px] font-bold text-[#14947f]">+۱۲٪ رشد ماهانه</p></Card><Card className="p-5"><p className="text-[11px] font-bold text-[#8b99ab]">کاربران فعال امروز</p><p className="mt-2 text-2xl font-extrabold text-[#1a2940]">۸۴۲</p><p className="mt-1 text-[10px] font-bold text-[#14947f]">+۸٫۴٪ نسبت به دیروز</p></Card><Card className="p-5"><p className="text-[11px] font-bold text-[#8b99ab]">میانگین پیام هر کاربر</p><p className="mt-2 text-2xl font-extrabold text-[#1a2940]">۲۲٫۵</p><p className="mt-1 text-[10px] font-bold text-[#9aa6b7]">در ۳۰ روز گذشته</p></Card></div><Card className="p-5"><div className="mb-5 flex items-center justify-between"><div><h2 className="text-[17px] font-extrabold text-[#1a2940]">بیشترین مشارکت</h2><p className="mt-1 text-[11px] text-[#8b99ab]">کاربرانی که بیشترین تعامل را داشته‌اند</p></div><Button size="sm" className="h-9 rounded-lg bg-[#eaf1ff] text-[10px] font-bold text-[#4e74bc] hover:bg-[#e0ebff]"><Plus size={14} />افزودن مدیر</Button></div><div className="overflow-x-auto rounded-2xl border border-[#edf0f4]"><table className="w-full min-w-[650px] text-right"><thead className="bg-[#f8fafc] text-[10px] font-bold text-[#8b99ab]"><tr><th className="px-4 py-3">کاربر</th><th className="px-4 py-3">ایمیل</th><th className="px-4 py-3">پیام‌ها</th><th className="px-4 py-3">پلن</th><th className="px-4 py-3">آخرین فعالیت</th></tr></thead><tbody className="divide-y divide-[#edf0f4]">{activeUsers.map((user) => <tr key={user.email} className="hover:bg-[#fbfcfe]"><td className="px-4 py-4"><div className="flex items-center gap-2.5"><UserAvatar initials={user.initials} tone={user.tone} size="sm" /><span className="text-[11px] font-extrabold text-[#2a3a51]">{user.name}</span></div></td><td className="px-4 py-4 text-[11px] text-[#7f8da0]">{user.email}</td><td className="px-4 py-4 text-[12px] font-extrabold text-[#34445c]">{user.messages}</td><td className="px-4 py-4"><span className="rounded-lg bg-[#f1f4f8] px-2 py-1 text-[10px] font-bold text-[#65738a]">{user.plan}</span></td><td className="px-4 py-4 text-[10px] font-semibold text-[#9ba7b6]">{user.lastActive}</td></tr>)}</tbody></table></div></Card></div>;
 }
 
@@ -248,28 +249,109 @@ function ConversationDialog({ message, onClose }) {
   return <Dialog open={Boolean(message)} onOpenChange={(open) => !open && onClose()}><DialogContent className="max-w-2xl border-[#e4eaf1] bg-white p-0 text-right shadow-[0_24px_80px_rgba(27,47,76,.2)]"><DialogHeader className="border-b border-[#edf0f4] bg-[#fbfcfe] p-6"><div className="flex items-start justify-between gap-4"><div><p className="text-[10px] font-bold tracking-[0.12em] text-[#8b99ab]">جزئیات مکالمه</p><DialogTitle className="mt-2 text-xl font-extrabold text-[#1a2940]">{message?.user}</DialogTitle><DialogDescription className="mt-1 text-xs text-[#8390a2]">{message?.time} · {message?.topic}</DialogDescription></div>{message && <StatusBadge status={message.status}>{message.statusLabel}</StatusBadge>}</div></DialogHeader>{message && <div className="space-y-5 p-6"><div className="rounded-2xl bg-[#f5f7fb] p-4"><div className="mb-2 flex items-center gap-2 text-[10px] font-bold text-[#8997a8]"><UserRound size={14} />پیام کاربر</div><p className="text-sm font-semibold leading-7 text-[#34445b]">{message.question}</p></div><div className="rounded-2xl border border-[#dcefe9] bg-[#f4fcfa] p-4"><div className="mb-2 flex items-center gap-2 text-[10px] font-bold text-[#159787]"><Bot size={14} />پاسخ دستیار</div><p className="text-sm leading-7 text-[#41665f]">{message.response}</p></div><div className="flex flex-wrap items-center justify-between gap-3"><div className="flex items-center gap-2 text-[10px] text-[#8b99ab]"><Database size={14} />منبع: پایگاه دانش لیارا</div><Button variant="outline" size="sm" className="border-[#e3eaf1] text-[10px]" onClick={onClose}><X size={14} />بستن</Button></div></div>}</DialogContent></Dialog>;
 }
 
-function AdminHeader({ onMenu, onNavigate, onRefresh, onLogout, user }) {
+function NotificationCenter({ notifications, onOpen, onMarkRead }) {
+  const unreadCount = notifications.filter((notification) => !notification.read).length;
+  return (
+    <DropdownMenu dir="rtl">
+      <DropdownMenuTrigger asChild>
+        <button type="button" aria-label={`اعلان‌ها${unreadCount ? `، ${unreadCount} اعلان خوانده‌نشده` : ""}`} className="relative flex h-10 w-10 items-center justify-center rounded-xl text-[hsl(var(--site-muted))] transition hover:bg-[hsl(var(--site-surface))] hover:text-[hsl(var(--site-accent-strong))] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[hsl(var(--site-accent))]">
+          <Bell size={18} />
+          {unreadCount > 0 && <span className="absolute right-1.5 top-1.5 flex h-4 min-w-4 items-center justify-center rounded-full bg-[#ed8f4b] px-1 text-[9px] font-extrabold text-white ring-2 ring-[hsl(var(--site-bg))]">{unreadCount}</span>}
+        </button>
+      </DropdownMenuTrigger>
+      <DropdownMenuContent align="end" className="w-[min(360px,calc(100vw-2rem))] border-[hsl(var(--site-border))] bg-[hsl(var(--site-surface))] p-2 text-right shadow-[0_18px_55px_hsl(var(--site-text)/.14)]">
+        <div className="flex items-center justify-between px-3 py-2"><span className="text-[13px] font-extrabold text-[hsl(var(--site-text))]">اعلان‌ها</span><span className="text-[10px] font-bold text-[hsl(var(--site-muted))]">{unreadCount ? `${unreadCount} خوانده‌نشده` : "همه خوانده شده"}</span></div>
+        <DropdownMenuSeparator className="bg-[hsl(var(--site-border))]" />
+        {notifications.length === 0 ? <p className="px-3 py-5 text-center text-xs text-[hsl(var(--site-muted))]">اعلانی وجود ندارد.</p> : notifications.map((notification) => (
+          <DropdownMenuItem key={notification.id} onSelect={() => onOpen(notification)} className={`items-start gap-3 rounded-xl px-3 py-3 text-right focus:bg-[hsl(var(--site-muted)/.08)] ${notification.read ? "opacity-60" : "bg-[hsl(var(--site-accent)/.06)]"}`}>
+            <span className={`mt-1 h-2 w-2 shrink-0 rounded-full ${notification.read ? "bg-[hsl(var(--site-border))]" : "bg-[hsl(var(--site-accent-strong))]"}`} />
+            <span className="min-w-0 flex-1"><span className="block text-[11px] font-extrabold text-[hsl(var(--site-text))]">{notification.title}</span><span className="mt-1 block text-[10px] leading-5 text-[hsl(var(--site-muted))]">{notification.description}</span><span className="mt-1 block text-[9px] text-[hsl(var(--site-muted))]">{notification.time}</span></span>
+            {!notification.read && <button type="button" onClick={(event) => { event.stopPropagation(); onMarkRead(notification.id); }} aria-label={`علامت‌گذاری ${notification.title} به‌عنوان خوانده‌شده`} className="shrink-0 rounded-lg px-1.5 py-1 text-[9px] font-bold text-[hsl(var(--site-accent-strong))] hover:bg-[hsl(var(--site-accent)/.12)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[hsl(var(--site-accent))]">خوانده شد</button>}
+          </DropdownMenuItem>
+        ))}
+      </DropdownMenuContent>
+    </DropdownMenu>
+  );
+}
+
+function AdminHeader({ onMenu, onNavigate, onProfile, onRefresh, onLogout, user, notifications, onNotificationOpen, onNotificationRead }) {
+  const { resolvedTheme, setTheme } = useTheme();
+  const sound = useUiSound();
+  const soundFeedbackRef = useRef(0);
+  const [mounted, setMounted] = useState(false);
+  useEffect(() => setMounted(true), []);
+  const isDark = mounted && resolvedTheme === "dark";
+  const toggleSound = () => {
+    const now = Date.now();
+    if (now - soundFeedbackRef.current < 180) return;
+    soundFeedbackRef.current = now;
+    const next = !sound.enabled;
+    if (next) {
+      sound.setEnabled(true);
+      void syncSoundEnabled(true).then(() => playUiSound("release", { volume: 0.18 }));
+    } else {
+      sound.playSound("press");
+      sound.setEnabled(false);
+    }
+  };
+  return <header className="sticky top-0 z-20 border-b border-[hsl(var(--site-border)/.9)] bg-[hsl(var(--site-bg)/.9)] px-4 py-3 backdrop-blur-xl sm:px-7 lg:px-10"><div className="flex items-center gap-3"><button type="button" onClick={onMenu} className="flex h-10 w-10 items-center justify-center rounded-xl border border-[hsl(var(--site-border))] bg-[hsl(var(--site-surface))] text-[hsl(var(--site-muted))] lg:hidden" aria-label="باز کردن منو"><Menu size={19} /></button><div className="mr-auto flex items-center gap-2"><button type="button" onClick={onRefresh} aria-label="به‌روزرسانی داده‌ها" className="hidden h-10 w-10 items-center justify-center rounded-xl text-[hsl(var(--site-muted))] transition hover:bg-[hsl(var(--site-surface))] hover:text-[hsl(var(--site-accent-strong))] sm:flex"><RotateCcw size={17} /></button><button type="button" onClick={() => { setTheme(isDark ? "light" : "dark"); sound.playSound("toggle"); }} aria-label={isDark ? "فعال‌کردن حالت روشن" : "فعال‌کردن حالت تاریک"} className="flex h-10 w-10 items-center justify-center rounded-xl text-[hsl(var(--site-muted))] transition hover:bg-[hsl(var(--site-surface))] hover:text-[hsl(var(--site-accent-strong))]">{isDark ? <Sun size={17} /> : <Moon size={17} />}</button><button type="button" onClick={toggleSound} aria-label={sound.enabled ? "خاموش‌کردن افکت صوتی" : "روشن‌کردن افکت صوتی"} aria-pressed={sound.enabled} className="hidden h-10 w-10 items-center justify-center rounded-xl text-[hsl(var(--site-muted))] transition hover:bg-[hsl(var(--site-surface))] hover:text-[hsl(var(--site-accent-strong))] sm:flex">{sound.enabled ? <Volume2 size={17} /> : <VolumeX size={17} />}</button><NotificationCenter notifications={notifications} onOpen={onNotificationOpen} onMarkRead={onNotificationRead} /><div className="mx-1 hidden h-7 w-px bg-[hsl(var(--site-border))] sm:block" /><DropdownMenu dir="rtl"><DropdownMenuTrigger asChild><button type="button" aria-label="باز کردن منوی پروفایل" className="flex items-center gap-2 rounded-xl px-2 py-1.5 text-right transition hover:bg-[hsl(var(--site-surface))] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[hsl(var(--site-accent))]"><UserAvatar initials="مد" tone="teal" size="sm" /><span className="hidden max-w-32 truncate text-[11px] font-extrabold text-[hsl(var(--site-text))] sm:block">{user?.name || "مدیر لیارا"}</span><ChevronDown size={14} className="text-[hsl(var(--site-muted))]" /></button></DropdownMenuTrigger><DropdownMenuContent align="end" className="min-w-48 border-[hsl(var(--site-border))] bg-[hsl(var(--site-surface))] text-[hsl(var(--site-text))]"><DropdownMenuLabel className="font-bold text-[hsl(var(--site-text))]">{user?.name || "مدیر لیارا"}</DropdownMenuLabel><DropdownMenuSeparator className="bg-[hsl(var(--site-border))]" /><DropdownMenuItem onSelect={onProfile}><UserRound size={15} />پروفایل شما</DropdownMenuItem><DropdownMenuItem onSelect={() => onNavigate("settings")}><Settings2 size={15} />تنظیمات</DropdownMenuItem><DropdownMenuSeparator className="bg-[hsl(var(--site-border))]" /><DropdownMenuItem onSelect={onLogout} className="text-[hsl(var(--site-danger-foreground))] focus:bg-[hsl(var(--site-danger)/.1)]"><LogOut size={15} />خروج</DropdownMenuItem></DropdownMenuContent></DropdownMenu></div></div></header>;
+}
+
+function ThemeControls() {
   const { resolvedTheme, setTheme } = useTheme();
   const sound = useUiSound();
   const [mounted, setMounted] = useState(false);
   useEffect(() => setMounted(true), []);
   const isDark = mounted && resolvedTheme === "dark";
-  return <header className="sticky top-0 z-20 border-b border-[hsl(var(--site-border)/.9)] bg-[hsl(var(--site-bg)/.9)] px-4 py-3 backdrop-blur-xl sm:px-7 lg:px-10"><div className="flex items-center gap-3"><button type="button" onClick={onMenu} className="flex h-10 w-10 items-center justify-center rounded-xl border border-[hsl(var(--site-border))] bg-[hsl(var(--site-surface))] text-[hsl(var(--site-muted))] lg:hidden" aria-label="باز کردن منو"><Menu size={19} /></button><div className="relative hidden w-[min(360px,42vw)] sm:block"><Search size={16} className="absolute right-3 top-1/2 -translate-y-1/2 text-[hsl(var(--site-muted))]" /><input className="h-10 w-full rounded-xl border border-[hsl(var(--site-border))] bg-[hsl(var(--site-input))] pr-10 text-xs text-[hsl(var(--site-text))] outline-none placeholder:text-[hsl(var(--site-muted))] focus:border-[hsl(var(--site-accent))]" placeholder="جستجوی سریع..." /></div><div className="mr-auto flex items-center gap-2"><button type="button" onClick={onRefresh} aria-label="به‌روزرسانی داده‌ها" className="hidden h-10 w-10 items-center justify-center rounded-xl text-[hsl(var(--site-muted))] transition hover:bg-[hsl(var(--site-surface))] hover:text-[hsl(var(--site-accent-strong))] sm:flex"><RotateCcw size={17} /></button><button type="button" onClick={() => { setTheme(isDark ? "light" : "dark"); sound.playSound("toggle"); }} aria-label={isDark ? "فعال‌کردن حالت روشن" : "فعال‌کردن حالت تاریک"} className="flex h-10 w-10 items-center justify-center rounded-xl text-[hsl(var(--site-muted))] transition hover:bg-[hsl(var(--site-surface))] hover:text-[hsl(var(--site-accent-strong))]">{isDark ? <Sun size={17} /> : <Moon size={17} />}</button><button type="button" onClick={() => sound.setEnabled(!sound.enabled)} aria-label={sound.enabled ? "خاموش‌کردن افکت صوتی" : "روشن‌کردن افکت صوتی"} aria-pressed={sound.enabled} className="hidden h-10 w-10 items-center justify-center rounded-xl text-[hsl(var(--site-muted))] transition hover:bg-[hsl(var(--site-surface))] hover:text-[hsl(var(--site-accent-strong))] sm:flex">{sound.enabled ? <Volume2 size={17} /> : <VolumeX size={17} />}</button><button type="button" aria-label="اعلان‌ها" className="relative flex h-10 w-10 items-center justify-center rounded-xl text-[hsl(var(--site-muted))] transition hover:bg-[hsl(var(--site-surface))] hover:text-[hsl(var(--site-accent-strong))]"><Bell size={18} /><span className="absolute right-2.5 top-2 h-1.5 w-1.5 rounded-full bg-[#ed8f4b] ring-2 ring-[hsl(var(--site-bg))]" /></button><div className="mx-1 hidden h-7 w-px bg-[hsl(var(--site-border))] sm:block" /><button type="button" onClick={() => onNavigate("settings")} className="hidden items-center gap-2 rounded-xl px-2 py-1.5 text-right transition hover:bg-[hsl(var(--site-surface))] sm:flex"><UserAvatar initials="مد" tone="teal" size="sm" /><span><span className="block max-w-28 truncate text-[11px] font-extrabold text-[hsl(var(--site-text))]">{user?.name || "مدیر لیارا"}</span><span className="block text-[9px] text-[hsl(var(--site-muted))]">مدیر سیستم</span></span><ChevronDown size={14} className="text-[hsl(var(--site-muted))]" /></button><button type="button" onClick={onLogout} aria-label="خروج از پنل" className="flex h-10 w-10 items-center justify-center rounded-xl text-[hsl(var(--site-muted))] transition hover:bg-[hsl(var(--site-danger)/.1)] hover:text-[hsl(var(--site-danger-foreground))]"><LogOut size={17} /></button></div></div></header>;
+  return <div className="fixed start-4 top-4 z-20 flex items-center gap-2"><button type="button" onClick={() => { setTheme(isDark ? "light" : "dark"); sound.playSound("toggle"); }} aria-label={isDark ? "فعال‌کردن حالت روشن" : "فعال‌کردن حالت تاریک"} className="flex h-11 w-11 items-center justify-center rounded-xl border border-[hsl(var(--site-border))] bg-[hsl(var(--site-surface)/.8)] text-[hsl(var(--site-muted))] shadow-sm backdrop-blur transition hover:text-[hsl(var(--site-accent-strong))] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[hsl(var(--site-accent))]">{isDark ? <Sun size={18} /> : <Moon size={18} />}</button><button type="button" onClick={() => sound.setEnabled(!sound.enabled)} aria-label={sound.enabled ? "خاموش‌کردن افکت صوتی" : "روشن‌کردن افکت صوتی"} aria-pressed={sound.enabled} className="flex h-11 w-11 items-center justify-center rounded-xl border border-[hsl(var(--site-border))] bg-[hsl(var(--site-surface)/.8)] text-[hsl(var(--site-muted))] shadow-sm backdrop-blur transition hover:text-[hsl(var(--site-accent-strong))] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[hsl(var(--site-accent))]">{sound.enabled ? <Volume2 size={18} /> : <VolumeX size={18} />}</button></div>;
 }
 
 function AdminAuthView() {
-  return <><Head><title>ورود به پنل مدیریت | لیارا</title><meta name="description" content="ورود امن به پنل مدیریت لیارا" /></Head><main dir="rtl" className="admin-auth-shell relative flex h-dvh max-h-dvh items-center justify-center overflow-hidden bg-[hsl(var(--site-bg))] px-4 py-4 sm:px-6 lg:py-8"><div className="relative h-auto max-h-full w-full max-w-[1120px]"><LoginForm /></div></main></>;
+  return <><Head><title>ورود به پنل مدیریت | لیارا</title><meta name="description" content="ورود امن به پنل مدیریت لیارا" /></Head><main dir="rtl" className="admin-auth-shell relative flex h-dvh max-h-dvh items-center justify-center overflow-hidden bg-[hsl(var(--site-bg))] px-4 py-4 sm:px-6 lg:py-8"><ThemeControls /><div className="relative h-auto max-h-full w-full max-w-[1120px]"><LoginForm /></div></main></>;
 }
 
 function AdminDashboardShell({ session }) {
   const user = session.user;
+  const router = useRouter();
   const [activeSection, setActiveSection] = useState("dashboard");
+  const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
   const [mobileOpen, setMobileOpen] = useState(false);
   const [selectedMessage, setSelectedMessage] = useState(null);
+  const [notifications, setNotifications] = useState(() => adminNotifications.map((notification) => ({ ...notification })));
+  const [toastNotification, setToastNotification] = useState(null);
   const [unknownItems, setUnknownItems] = useState(unknownTopics);
+  const [adminData, setAdminData] = useState({ dashboard: { kpis, weekly: weeklyMessages, topics }, messages: messageRows, users: activeUsers, unanswered: unknownTopics, analytics: {} });
   const [loading, setLoading] = useState(false);
   const [lastUpdated, setLastUpdated] = useState("همین حالا");
   const meta = adminPageMeta[activeSection];
+
+  const loadOverview = () => fetch("/api/admin/overview").then((response) => response.ok ? response.json() : Promise.reject(new Error("overview unavailable"))).then((data) => {
+    setAdminData(data);
+    setUnknownItems(data.unanswered || []);
+    setLastUpdated("همین حالا");
+  }).catch((error) => console.error("Admin overview refresh failed", error));
+
+  useEffect(() => {
+    loadOverview();
+    const socket = new window.WebSocket(`${window.location.protocol === "https:" ? "wss" : "ws"}://${window.location.host}/api/realtime`);
+    socket.addEventListener("message", (event) => {
+      try {
+        if (JSON.parse(event.data).type === "chat.updated") loadOverview();
+      } catch { /* ignore malformed realtime events */ }
+    });
+    return () => socket.close();
+  }, []);
+
+  useEffect(() => {
+    let initialNotifications = adminNotifications.map((notification) => ({ ...notification }));
+    try {
+      const saved = JSON.parse(window.localStorage.getItem("liara-admin-notifications") || "null");
+      if (Array.isArray(saved)) initialNotifications = adminNotifications.map((notification) => ({ ...notification, read: saved.find((item) => item.id === notification.id)?.read ?? notification.read }));
+    } catch { /* use the default notification state */ }
+    setNotifications(initialNotifications);
+    const timer = window.setTimeout(() => setToastNotification(initialNotifications.find((notification) => !notification.read) || null), 700);
+    return () => window.clearTimeout(timer);
+  }, []);
 
   const navigate = (section) => {
     setMobileOpen(false);
@@ -281,7 +363,26 @@ function AdminDashboardShell({ session }) {
 
   const refresh = () => {
     setLoading(true);
-    window.setTimeout(() => { setLoading(false); setLastUpdated("همین حالا"); }, 500);
+    loadOverview().finally(() => setLoading(false));
+  };
+
+  const markNotificationRead = (notificationId) => {
+    setToastNotification((current) => current?.id === notificationId ? null : current);
+    setNotifications((current) => {
+      const next = current.map((notification) => notification.id === notificationId ? { ...notification, read: true } : notification);
+      window.localStorage.setItem("liara-admin-notifications", JSON.stringify(next.map(({ id, read }) => ({ id, read }))));
+      return next;
+    });
+  };
+
+  const openNotification = (notification) => {
+    markNotificationRead(notification.id);
+    setToastNotification(null);
+    const message = adminData.messages.find((row) => row.id === notification.messageId);
+    if (message) {
+      setActiveSection("messages");
+      setSelectedMessage(message);
+    }
   };
 
   const logout = async () => {
@@ -292,10 +393,11 @@ function AdminDashboardShell({ session }) {
   return <>
     <Head><title>پنل مدیریت لیارا</title><meta name="description" content="پنل مانیتورینگ و مدیریت دستیار هوشمند لیارا" /></Head>
     <div dir="rtl" className="admin-shell min-h-dvh bg-[#f5f7fb] text-[#1a2940] selection:bg-[#bcefe7] selection:text-[#143b3a]">
-      <aside className="fixed inset-y-0 right-0 z-30 hidden w-72 bg-[#14233a] lg:block"><AdminSidebar activeSection={activeSection} onNavigate={navigate} onLogout={logout} user={user} /></aside>
-      <Sheet open={mobileOpen} onOpenChange={setMobileOpen}><SheetContent side="right" className="w-[285px] border-[#2a3b56] bg-[#14233a] p-0 text-white"><AdminSidebar activeSection={activeSection} onNavigate={navigate} onLogout={logout} user={user} mobile /></SheetContent></Sheet>
-      <div className="lg:pr-72"><AdminHeader onMenu={() => setMobileOpen(true)} onNavigate={navigate} onRefresh={refresh} onLogout={logout} user={user} /><main className="px-4 py-6 sm:px-7 lg:px-10 lg:py-8"><div className="mx-auto max-w-[1500px]"><div className="mb-7 flex flex-col justify-between gap-5 md:flex-row md:items-end"><div><div className="mb-3 flex items-center gap-2 text-[10px] font-bold tracking-[0.12em] text-[#7e8da1]"><span className="h-1.5 w-1.5 rounded-full bg-[#18a996]" />{meta.eyebrow}</div><h1 className="text-[25px] font-extrabold tracking-tight text-[#1b2b43] sm:text-[30px]">{meta.title}</h1><p className="mt-2 max-w-2xl text-xs leading-6 text-[#8390a2]">{meta.description}</p></div><div className="flex items-center gap-2"><span className="hidden text-[10px] font-semibold text-[#9aa6b7] sm:inline">آخرین به‌روزرسانی: {lastUpdated}</span><Button variant="outline" size="sm" className="h-10 border-[#e2e8f0] bg-white text-xs text-[#5f6f84]" onClick={refresh}><RotateCcw size={14} />به‌روزرسانی</Button></div></div>{loading ? <div className="grid gap-5"><Card className="flex min-h-[420px] items-center justify-center"><div className="text-center"><span className="mx-auto flex h-11 w-11 animate-pulse items-center justify-center rounded-2xl bg-[#e9f0fb] text-[#5b7fc1]"><Wifi size={20} /></span><p className="mt-4 text-sm font-bold text-[#54647a]">در حال دریافت داده‌ها...</p><p className="mt-1 text-[11px] text-[#9aa6b7]">این صفحه لحظه‌ای دیگر آماده است.</p></div></Card></div> : activeSection === "dashboard" ? <DashboardPage onSelect={setSelectedMessage} onNavigate={navigate} /> : activeSection === "messages" ? <MessagesPage onSelect={setSelectedMessage} /> : activeSection === "unanswered" ? <UnansweredPage items={unknownItems} onResolve={(id) => setUnknownItems((current) => current.filter((item) => item.id !== id))} onSelect={setSelectedMessage} /> : activeSection === "analytics" ? <AnalyticsPage /> : activeSection === "users" ? <UsersPage /> : <SettingsPage />}</div></main></div>
+      <aside className={`fixed inset-y-0 right-0 z-30 hidden bg-[#14233a] transition-[width] duration-200 lg:block ${sidebarCollapsed ? "w-20" : "w-64"}`}><AdminSidebar activeSection={activeSection} onNavigate={navigate} collapsed={sidebarCollapsed} onToggle={() => setSidebarCollapsed((current) => !current)} /></aside>
+      <Sheet open={mobileOpen} onOpenChange={setMobileOpen}><SheetContent side="right" className="w-[285px] border-[#2a3b56] bg-[#14233a] p-0 text-white"><AdminSidebar activeSection={activeSection} onNavigate={navigate} mobile /></SheetContent></Sheet>
+      <div className={sidebarCollapsed ? "lg:pr-20" : "lg:pr-64"}><AdminHeader onMenu={() => setMobileOpen(true)} onNavigate={navigate} onProfile={() => router.push("/admin/profile")} onRefresh={refresh} onLogout={logout} user={user} notifications={notifications} onNotificationOpen={openNotification} onNotificationRead={markNotificationRead} /><main className="px-4 py-6 sm:px-7 lg:px-10 lg:py-8"><div className="mx-auto max-w-[1500px]"><div className="mb-7 flex flex-col justify-between gap-5 md:flex-row md:items-end"><div><div className="mb-3 flex items-center gap-2 text-[10px] font-bold tracking-[0.12em] text-[#7e8da1]"><span className="h-1.5 w-1.5 rounded-full bg-[#18a996]" />{meta.eyebrow}</div><h1 className="text-[25px] font-extrabold tracking-tight text-[#1b2b43] sm:text-[30px]">{activeSection === "dashboard" ? `سلام، ${user.name}` : meta.title}</h1><p className="mt-2 max-w-2xl text-xs leading-6 text-[#8390a2]">{meta.description}</p></div><div className="flex items-center gap-2"><span className="hidden text-[10px] font-semibold text-[#9aa6b7] sm:inline">آخرین به‌روزرسانی: {lastUpdated}</span><Button variant="outline" size="sm" className="h-10 border-[#e2e8f0] bg-white text-xs text-[#5f6f84]" onClick={refresh}><RotateCcw size={14} />به‌روزرسانی</Button></div></div>{loading ? <div className="grid gap-5"><Card className="flex min-h-[420px] items-center justify-center"><div className="text-center"><span className="mx-auto flex h-11 w-11 animate-pulse items-center justify-center rounded-2xl bg-[#e9f0fb] text-[#5b7fc1]"><Wifi size={20} /></span><p className="mt-4 text-sm font-bold text-[#54647a]">در حال دریافت داده‌ها...</p><p className="mt-1 text-[11px] text-[#9aa6b7]">این صفحه لحظه‌ای دیگر آماده است.</p></div></Card></div> : activeSection === "dashboard" ? <DashboardPage data={adminData} onSelect={setSelectedMessage} onNavigate={navigate} /> : activeSection === "messages" ? <MessagesPage items={adminData.messages} onSelect={setSelectedMessage} /> : activeSection === "unanswered" ? <UnansweredPage items={unknownItems} onResolve={(id) => setUnknownItems((current) => current.filter((item) => item.id !== id))} onSelect={setSelectedMessage} /> : activeSection === "analytics" ? <AnalyticsPage /> : activeSection === "users" ? <UsersPage items={adminData.users} /> : <SettingsPage />}</div></main></div>
     </div>
+    {toastNotification && <Toast notification={toastNotification} onOpen={() => openNotification(toastNotification)} onDismiss={() => setToastNotification(null)} />}
     <ConversationDialog message={selectedMessage} onClose={() => setSelectedMessage(null)} />
   </>;
 }

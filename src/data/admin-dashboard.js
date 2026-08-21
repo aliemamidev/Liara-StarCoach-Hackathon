@@ -57,6 +57,12 @@ export const messageRows = [
   { id: "msg-2042", user: "پارسا توکلی", initials: "پ‌ت", question: "چطور لاگ‌های کانتینر را فقط برای ۷ روز نگه دارم؟", topic: "پایش و لاگ", status: "answered", statusLabel: "پاسخ مناسب", time: "دیروز، ۲۳:۵۹", channel: "چت وب", response: "سیاست نگه‌داری لاگ را روی ۷ روز تنظیم کنید و برای کاهش حجم، چرخش لاگ را فعال نگه دارید." },
 ];
 
+export const adminNotifications = [
+  { id: "notif-2048", title: "مکالمه جدید برای بررسی", description: "پاسخ مربوط به استقرار اپلیکیشن نیازمند بازبینی است.", time: "همین حالا", messageId: "msg-2048", read: false },
+  { id: "notif-2047", title: "پاسخ احتمالی ثبت شد", description: "یک پاسخ عمومی درباره فضای ذخیره‌سازی ثبت شده است.", time: "۱۲ دقیقه پیش", messageId: "msg-2047", read: false },
+  { id: "notif-2046", title: "مکالمه پاسخ داده شد", description: "پرسش مربوط به خطای ۵۰۲ پاسخ داده شد.", time: "۴۵ دقیقه پیش", messageId: "msg-2046", read: true },
+];
+
 export const unknownTopics = [
   { id: "topic-01", title: "محاسبه هزینه سرویس ناشناخته", count: "۳۸", lastSeen: "۲ ساعت پیش", severity: "high", examples: ["این آیتم در فاکتور من چیست؟", "هزینه سرویس X از کجا آمده؟"] },
   { id: "topic-02", title: "اتصال سرویس به شبکه خصوصی", count: "۲۷", lastSeen: "۵ ساعت پیش", severity: "medium", examples: ["آیا سرویس من به VPC وصل می‌شود؟", "ارتباط داخلی بین دو اپلیکیشن"] },

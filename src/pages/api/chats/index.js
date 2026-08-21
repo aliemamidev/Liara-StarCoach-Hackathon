@@ -1,6 +1,7 @@
 import { randomUUID } from "node:crypto";
 import { prisma } from "@/lib/prisma";
 import { getChatOwner } from "@/lib/chat-owner";
+import { publishRealtime } from "@/lib/realtime.mjs";
 
 function cleanMessage(message) {
   return {
@@ -69,6 +70,7 @@ export default async function handler(req, res) {
       : await prisma.chat.create({ data: { id: chat.id, ...data } });
     await prisma.message.deleteMany({ where: { chatId: saved.id } });
     if (chat.messages.length) await prisma.message.createMany({ data: chat.messages.map((message) => ({ ...message, chatId: saved.id })) });
+    publishRealtime("chat.updated", { chatId: saved.id, owner: owner.userId ? "user" : "guest", messageCount: chat.messages.length });
     return res.status(200).json({ ok: true });
   } catch (error) {
     console.error("Chat persistence failed", error);
