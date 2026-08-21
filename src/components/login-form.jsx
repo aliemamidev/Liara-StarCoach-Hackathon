@@ -1,6 +1,7 @@
 import { useRef, useState } from "react";
 import { useRouter } from "next/router";
-import { Eye, EyeOff, Loader2, ShieldCheck, Sparkles } from "lucide-react";
+import Image from "next/image";
+import { Eye, EyeOff, Loader2 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useUiSound } from "@/hooks/use-ui-sound";
 import { Button } from "@/components/ui/button";
@@ -80,18 +81,17 @@ export function LoginForm({ className, ...props }) {
   const firstError = errors.email || errors.password || serverError;
 
   return (
-    <div className={cn("flex flex-col gap-5", className)} {...props}>
-      <Card className="overflow-hidden border-[hsl(var(--site-border))] bg-[hsl(var(--site-surface))] shadow-[0_24px_80px_hsl(var(--site-text)/.12)]">
-        <CardContent className="grid p-0 md:grid-cols-2">
-          <form className="order-2 p-6 sm:p-8 md:order-1" onSubmit={submit} noValidate>
-            <div className="flex flex-col gap-6">
+    <div className={cn("flex flex-col gap-4", className)} dir="rtl" {...props}>
+      <Card className="overflow-hidden rounded-[28px] border-[hsl(var(--site-border))] bg-[hsl(var(--site-surface))] shadow-[0_24px_70px_hsl(var(--site-text)/.12)]">
+        <CardContent className="grid min-h-[620px] p-0 md:grid-cols-2">
+          <form className="order-2 flex items-center p-7 sm:p-10 md:order-2 lg:p-14" onSubmit={submit} noValidate>
+            <div className="w-full">
+              <div className="mb-10 flex items-center justify-between md:hidden">
+                <Image src="/static/logo.svg" alt="لیارا" width={91} height={40} priority className="h-10 w-auto" />
+              </div>
               <div className="text-right">
-                <div className="mb-6 flex items-center justify-between md:hidden">
-                  <div className="flex items-center gap-2 text-sm font-extrabold"><span className="flex h-9 w-9 items-center justify-center rounded-xl bg-[hsl(var(--site-accent))] text-[hsl(var(--site-accent-foreground))]"><Sparkles size={17} /></span>لیارا</div>
-                </div>
-                <p className="mb-2 text-xs font-bold text-[hsl(var(--site-accent-strong))]">ورود مدیران</p>
-                <h1 className="text-2xl font-black tracking-tight sm:text-3xl">خوش برگشتید</h1>
-                <p className="mt-3 text-sm leading-7 text-[hsl(var(--site-muted))]">برای ورود به مرکز مدیریت لیارا، اطلاعات خود را وارد کنید.</p>
+                <h1 className="text-[28px] font-black tracking-tight text-[hsl(var(--site-text))] sm:text-3xl">ورود به پنل مدیریت</h1>
+                <p className="mt-3 text-sm leading-7 text-[hsl(var(--site-muted))]">برای ادامه، اطلاعات حساب خود را وارد کنید.</p>
               </div>
 
               {firstError && (
@@ -100,14 +100,14 @@ export function LoginForm({ className, ...props }) {
                 </div>
               )}
 
-              <div className="grid gap-2">
-                <Label htmlFor="admin-email">ایمیل</Label>
+              <div className="mt-9 grid gap-2">
+                <Label htmlFor="admin-email" className="text-[13px] font-extrabold">ایمیل</Label>
                 <Input id="admin-email" type="email" inputMode="email" autoComplete="email" dir="ltr" value={values.email} onChange={update("email")} onBlur={() => validateField("email")} aria-invalid={Boolean(errors.email)} aria-describedby={errors.email ? "admin-email-error" : undefined} placeholder="admin@example.com" className="h-12 rounded-xl border-[hsl(var(--site-border))] bg-[hsl(var(--site-input))] text-left focus-visible:ring-[hsl(var(--site-accent))]" required />
                 {errors.email && <p id="admin-email-error" className="text-xs font-semibold text-[hsl(var(--site-danger-foreground))]">{errors.email}</p>}
               </div>
 
-              <div className="grid gap-2">
-                <Label htmlFor="admin-password">رمز عبور</Label>
+              <div className="mt-5 grid gap-2">
+                <Label htmlFor="admin-password" className="text-[13px] font-extrabold">رمز عبور</Label>
                 <div className="relative">
                   <Input id="admin-password" type={showPassword ? "text" : "password"} autoComplete="current-password" dir="ltr" value={values.password} onChange={update("password")} onBlur={() => validateField("password")} aria-invalid={Boolean(errors.password)} aria-describedby={errors.password ? "admin-password-error" : undefined} className="h-12 rounded-xl border-[hsl(var(--site-border))] bg-[hsl(var(--site-input))] pe-12 text-left focus-visible:ring-[hsl(var(--site-accent))]" required />
                   <button type="button" onClick={() => { setShowPassword((current) => !current); sound.playSound("toggle"); }} aria-label={showPassword ? "مخفی کردن رمز عبور" : "نمایش رمز عبور"} className="absolute end-1 top-1 flex h-10 w-10 items-center justify-center rounded-lg text-[hsl(var(--site-muted))] transition hover:bg-[hsl(var(--site-muted)/.12)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[hsl(var(--site-accent))]">
@@ -117,29 +117,22 @@ export function LoginForm({ className, ...props }) {
                 {errors.password && <p id="admin-password-error" className="text-xs font-semibold text-[hsl(var(--site-danger-foreground))]">{errors.password}</p>}
               </div>
 
-              <Button type="submit" disabled={loading} aria-busy={loading} className="h-12 w-full rounded-xl bg-[hsl(var(--site-accent))] text-base font-extrabold text-[hsl(var(--site-accent-foreground))] shadow-[0_12px_28px_hsl(var(--site-accent)/.25)] hover:bg-[hsl(var(--site-accent-strong))]">
+              <Button type="submit" disabled={loading} aria-busy={loading} className="mt-7 h-12 w-full rounded-xl bg-[hsl(var(--site-accent))] text-[15px] font-extrabold text-[hsl(var(--site-accent-foreground))] shadow-[0_12px_28px_hsl(var(--site-accent)/.22)] hover:bg-[hsl(var(--site-accent-strong))]">
                 {loading ? <><Loader2 size={18} className="animate-spin" aria-hidden="true" />در حال بررسی...</> : "ورود به پنل"}
               </Button>
-              <p className="text-center text-xs leading-6 text-[hsl(var(--site-muted))]">این بخش فقط برای مدیران مجاز سامانه در دسترس است.</p>
+              <p className="mt-5 text-center text-xs leading-6 text-[hsl(var(--site-muted))]">دسترسی این بخش فقط برای اعضای مجاز تیم است.</p>
             </div>
           </form>
 
-          <div className="login-visual order-1 relative hidden min-h-[520px] overflow-hidden bg-[hsl(var(--site-brand-surface))] p-8 text-white md:order-2 md:flex md:flex-col md:justify-between">
-            <div className="login-visual-grid absolute inset-0 opacity-60" aria-hidden="true" />
-            <div className="relative flex items-center justify-between">
-              <div className="flex items-center gap-3 text-lg font-black"><span className="flex h-11 w-11 items-center justify-center rounded-2xl bg-[hsl(var(--site-accent))] text-[hsl(var(--site-accent-foreground))] shadow-[0_10px_30px_hsl(var(--site-accent)/.25)]"><Sparkles size={21} /></span>لیارا</div>
-              <span className="rounded-full border border-white/15 bg-white/10 px-3 py-1.5 text-[10px] font-bold text-white/75">مرکز مدیریت</span>
+          <div className="login-visual order-1 relative hidden min-h-[620px] overflow-hidden bg-[hsl(var(--site-brand-surface))] md:order-1 md:block">
+            <Image src="/static/images/liara-admin-login-visual.png" alt="زیرساخت ابری و سرویس‌های لیارا" fill priority sizes="(max-width: 1024px) 50vw, 520px" className="object-cover object-center" />
+            <div className="absolute inset-0 bg-gradient-to-b from-[hsl(var(--site-brand-surface)/.12)] via-transparent to-[hsl(var(--site-brand-surface)/.28)]" aria-hidden="true" />
+            <div className="absolute inset-x-8 top-8 flex items-center justify-between">
+              <Image src="/static/logo.svg" alt="لیارا" width={91} height={40} priority className="h-10 w-auto brightness-0 invert" />
             </div>
-            <div className="relative">
-              <div className="mb-5 flex h-14 w-14 items-center justify-center rounded-2xl border border-white/15 bg-white/10 text-[hsl(var(--site-accent))]"><ShieldCheck size={28} /></div>
-              <h2 className="max-w-xs text-3xl font-black leading-[1.35]">کنترل هوشمند، آرامش بیشتر</h2>
-              <p className="mt-4 max-w-sm text-sm leading-7 text-white/65">تعاملات، کاربران و سلامت دستیار را از یک فضای امن و یکپارچه مدیریت کنید.</p>
-            </div>
-            <div className="relative flex items-center gap-3 border-t border-white/10 pt-5 text-xs text-white/55"><span className="h-2 w-2 animate-pulse rounded-full bg-[hsl(var(--site-accent))]" />سامانه پایدار و آماده به کار</div>
           </div>
         </CardContent>
       </Card>
-      <p className="text-center text-xs leading-6 text-[hsl(var(--site-muted))]">با ورود به پنل، قوانین استفاده و سیاست حفظ حریم خصوصی لیارا را می‌پذیرید.</p>
     </div>
   );
 }
