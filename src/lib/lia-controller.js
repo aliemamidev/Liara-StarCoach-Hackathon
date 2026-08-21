@@ -10,6 +10,7 @@ export const LIA_STAGES = Object.freeze({
   ESCALATED: "escalated",
   ADMIN_ANSWERED: "admin_answered",
   PROBABLE: "probable",
+  UNANSWERED: "unanswered",
   OUT_OF_SCOPE: "out_of_scope",
 });
 
@@ -183,7 +184,13 @@ function understandingComplete(query, conversation) {
   return detectedService(combined) && hasGoal(combined) && (!diagnostic || (hasErrorDescription(combined) && hasEnvironment(combined)));
 }
 
-export async function createLiaControllerPlan(messages) {
+export async function createLiaControllerPlan(messages, settings = {}) {
+  const controllerSettings = {
+    webSearchEnabled: settings.webSearchEnabled !== false,
+    probableAnswersEnabled: settings.probableAnswersEnabled !== false,
+    autoEscalationEnabled: settings.autoEscalationEnabled !== false,
+    captureUnknownTopics: settings.captureUnknownTopics !== false,
+  };
   const query = latestUserText(messages);
   const priorStage = previousStage(messages);
   const conversation = allUserText(messages);
@@ -251,27 +258,33 @@ export async function createLiaControllerPlan(messages) {
     };
   }
 
-  searchTrace.push("web");
-  const web = await searchWeb(`${conversation} ${query}`);
-  if (web.available) hits = mergeHits(hits, web.hits);
-  documentationAvailable = documentationAvailable || web.available;
-  if (isStrongEvidence(hits, retrievalQuery)) {
-    return { mode: LIA_STAGES.ANSWER, stage: LIA_STAGES.ANSWER, query, hits, brainHits, searchTrace };
+  if (controllerSettings.webSearchEnabled) {
+    searchTrace.push("web");
+    const web = await searchWeb(`${conversation} ${query}`);
+    if (web.available) hits = mergeHits(hits, web.hits);
+    documentationAvailable = documentationAvailable || web.available;
+    if (isStrongEvidence(hits, retrievalQuery)) {
+      return { mode: LIA_STAGES.ANSWER, stage: LIA_STAGES.ANSWER, query, hits, brainHits, searchTrace };
+    }
   }
 
   if (generalTechnical) {
-    return { mode: LIA_STAGES.PROBABLE, stage: LIA_STAGES.PROBABLE, query, hits, brainHits, searchTrace, documentationAvailable };
+    if (controllerSettings.probableAnswersEnabled) {
+      return { mode: LIA_STAGES.PROBABLE, stage: LIA_STAGES.PROBABLE, query, hits, brainHits, searchTrace, documentationAvailable };
+    }
   }
 
+  const unresolvedMode = controllerSettings.autoEscalationEnabled ? LIA_STAGES.ESCALATED : LIA_STAGES.UNANSWERED;
   return {
-    mode: LIA_STAGES.ESCALATED,
-    stage: LIA_STAGES.ESCALATED,
+    mode: unresolvedMode,
+    stage: unresolvedMode,
     query,
     clarifiedQuestion: `${conversation} ${query}`.trim().slice(0, 5000),
     hits,
     brainHits,
     searchTrace,
     documentationAvailable,
+    metadata: { capturedUnknown: controllerSettings.captureUnknownTopics },
   };
 }
 

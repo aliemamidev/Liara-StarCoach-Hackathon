@@ -237,7 +237,8 @@ sidebar[class*="bg-[#fbfbfb]"] .badge {
 }
 
 .admin-shell aside nav {
-  scrollbar-width: thin;
+  overflow: hidden;
+  scrollbar-width: none;
 }
 
 .admin-shell main,
@@ -325,7 +326,11 @@ sidebar[class*="bg-[#fbfbfb]"] .badge {
 
 @media (prefers-reduced-motion: reduce) {
   .login-visual-grid,
-  .admin-auth-orb {
+  .admin-auth-orb,
+  .admin-shell aside,
+  .admin-shell > div,
+  .chat-thinking-dots {
     animation: none !important;
+    transition: none !important;
   }
 }

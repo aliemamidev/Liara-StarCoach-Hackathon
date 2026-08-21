@@ -11,7 +11,7 @@ export const adminNavItems = [
 
 export const adminPageMeta = {
   dashboard: {
-    eyebrow: "مرکز فرمان لیارا",
+    eyebrow: "",
     title: "سلام، سارا",
     description: "این‌جا تصویری زنده از رفتار کاربران و سلامت دستیار هوشمند را می‌بینید.",
   },
@@ -21,7 +21,7 @@ export const adminPageMeta = {
     description: "مکالمه‌ها را جستجو کنید و پاسخ‌هایی را که نیازمند بازبینی هستند پیدا کنید.",
   },
   unanswered: {
-    eyebrow: "سیگنال‌های محصول",
+    eyebrow: "",
     title: "پرسش‌های بی‌پاسخ",
     description: "موضوعاتی که دانش فعلی دستیار پوشش نمی‌دهد، این‌جا اولویت‌بندی شده‌اند.",
   },
@@ -46,9 +46,9 @@ export const adminPageMeta = {
     description: "ریتم استفاده و آخرین فعالیت اعضای سیستم را بررسی کنید.",
   },
   settings: {
-    eyebrow: "پیکربندی پنل",
+    eyebrow: "",
     title: "تنظیمات مانیتورینگ",
-    description: "آستانه‌ها و نحوه دریافت هشدارها را مطابق نیاز تیم تنظیم کنید.",
+    description: "رفتار لیا و اعلان‌های مانیتورینگ را مدیریت کنید.",
   },
 };
 

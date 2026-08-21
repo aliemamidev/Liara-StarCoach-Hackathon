@@ -41,6 +41,7 @@ export default async function handler(req, res) {
     const valid = user && user.isActive && user.role === "ADMIN" && await verifyPassword(password, user.passwordHash);
     if (!valid) return res.status(401).json({ message: "ایمیل یا رمز عبور نادرست است." });
 
+    user = await prisma.user.update({ where: { id: user.id }, data: { lastLoginAt: new Date() } });
     await createAdminSession(res, user.id);
     return res.status(200).json({ ok: true, user: getPublicUser(user) });
   } catch (error) {

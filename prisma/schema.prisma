@@ -26,10 +26,12 @@ enum EscalationStatus {
 model User {
   id           String    @id @default(cuid())
   email        String    @unique
+  phone        String?   @unique
   name         String
   passwordHash String
   role         UserRole  @default(USER)
   isActive     Boolean   @default(true)
+  lastLoginAt  DateTime?
   createdAt    DateTime  @default(now())
   updatedAt    DateTime  @updatedAt
   sessions     Session[]
@@ -39,6 +41,17 @@ model User {
 
   @@index([role])
   @@index([isActive])
+}
+
+model AdminSettings {
+  id                    String   @id @default("default")
+  captureUnknownTopics  Boolean  @default(true)
+  notifyFailures        Boolean  @default(true)
+  webSearchEnabled      Boolean  @default(true)
+  probableAnswersEnabled Boolean  @default(true)
+  autoEscalationEnabled Boolean  @default(true)
+  createdAt             DateTime @default(now())
+  updatedAt             DateTime @updatedAt
 }
 
 model Chat {

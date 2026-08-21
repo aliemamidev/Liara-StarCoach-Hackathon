@@ -74,7 +74,14 @@ export async function deleteSession(req, res) {
 }
 
 export function getPublicUser(user) {
-  return { id: user.id, email: user.email, name: user.name, role: user.role };
+  return {
+    id: user.id,
+    email: user.email,
+    phone: user.phone || null,
+    name: user.name,
+    role: user.role,
+    lastLoginAt: user.lastLoginAt ? user.lastLoginAt.toISOString() : null,
+  };
 }
 
 export function hashOpaqueValue(value) {

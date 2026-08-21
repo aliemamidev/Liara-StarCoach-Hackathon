@@ -20,8 +20,10 @@ export async function getServerSideProps({ req, res }) {
           user: {
             id: session.user.id,
             email: session.user.email,
+            phone: session.user.phone,
             name: session.user.name,
             role: session.user.role,
+            lastLoginAt: session.user.lastLoginAt,
           },
         },
       },

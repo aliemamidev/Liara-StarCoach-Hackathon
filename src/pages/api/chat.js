@@ -12,6 +12,7 @@ import { formatKnowledgeContext, formatKnowledgeSources } from "@/lib/lia-brain"
 import { createOrReuseEscalation } from "@/lib/lia-escalations";
 import { prisma } from "@/lib/prisma";
 import { getChatOwner } from "@/lib/chat-owner";
+import { getAdminSettings } from "@/lib/admin-settings";
 import { publishRealtime } from "@/lib/realtime.mjs";
 import { AI_UNAVAILABLE_MESSAGE, createLiaControllerPlan, isUnsafeLiaDraft, LIA_STAGES, OUT_OF_SCOPE_MESSAGE, PROBABLE_FALLBACK_NOTICE, UNSAFE_DRAFT_MESSAGE, validateLiaDraft } from "@/lib/lia-controller";
 import { LIA_PROBABLE_SYSTEM_PROMPT, LIA_SYSTEM_PROMPT } from "@/lib/lia-persona";
@@ -89,6 +90,10 @@ const ESCALATION_MESSAGE = `## ارسال برای بررسی
 
 برای این سؤال هنوز پاسخ قابل‌اتکایی در منابع موجود پیدا نکردم. درخواستت برای بررسی ادمین ارسال شد؛ پاسخ تأییدشده در همین گفتگو نمایش داده می‌شود.`;
 
+const UNANSWERED_MESSAGE = `## پاسخ
+
+در منابع موجود پاسخ مطمئنی برای این سؤال پیدا نکردم. موضوع برای بررسی‌های بعدی ثبت شد.`;
+
 async function pipeEscalation(response, messages, chatId, plan) {
   const ticket = await createOrReuseEscalation({ chatId, messages, query: plan.query, clarifiedQuestion: plan.clarifiedQuestion, plan });
   publishRealtime("escalation.created", { ticketId: ticket.id, chatId });
@@ -109,13 +114,19 @@ export default async function handler(req, res) {
   try {
     const owner = await getChatOwner(req, res);
     const chatId = await ensureChatOwnership(String(req.body?.chatId || req.body?.id || ""), owner);
-    const plan = await createLiaControllerPlan(messages);
+    const settings = await getAdminSettings();
+    const plan = await createLiaControllerPlan(messages, settings);
     if (plan.mode === LIA_STAGES.OUT_OF_SCOPE) return await pipeStaticMessage(res, messages, OUT_OF_SCOPE_MESSAGE, plan.stage);
     if (plan.mode === LIA_STAGES.CLARIFICATION || plan.mode === LIA_STAGES.SCREENSHOT) {
       return await pipeStaticMessage(res, messages, plan.message, plan.stage, plan.metadata || {});
     }
     if (plan.mode === LIA_STAGES.ESCALATED) {
       return await pipeEscalation(res, messages, chatId, plan);
+    }
+    if (plan.mode === LIA_STAGES.UNANSWERED) {
+      return await pipeStaticMessage(res, messages, UNANSWERED_MESSAGE, plan.stage, {
+        capturedUnknown: plan.metadata?.capturedUnknown === true,
+      });
     }
 
     if (plan.mode === LIA_STAGES.ANSWER && plan.brainHits?.length && !plan.hits?.length) {
