@@ -279,6 +279,7 @@ sidebar[class*="bg-[#fbfbfb]"] .badge {
 .link-preview-card { display: flex; width: 100%; max-width: 34rem; margin: .75rem 0; overflow: hidden; border: 1px solid hsl(var(--site-border, var(--chat-border))); border-radius: 1rem; background: hsl(var(--site-surface, var(--chat-bg))); color: hsl(var(--site-text, var(--chat-text))); text-decoration: none !important; box-shadow: 0 8px 24px hsl(var(--site-card-shadow, var(--chat-text)) / .08); transition: transform .18s ease, border-color .18s ease, box-shadow .18s ease; }
 .link-preview-card:hover { transform: translateY(-2px); border-color: hsl(var(--site-accent, var(--chat-accent)) / .65); box-shadow: 0 12px 30px hsl(var(--site-card-shadow, var(--chat-text)) / .14); }
 .link-preview-card-image { height: 6rem; width: 6rem; flex: 0 0 6rem; object-fit: cover; background: hsl(var(--site-brand-surface, var(--chat-bg))); }
+.link-preview-card-icon { display: inline-flex; align-items: center; justify-content: center; color: hsl(var(--site-accent, var(--chat-accent))); }
 .link-preview-card-body { display: flex; min-width: 0; flex-direction: column; justify-content: center; gap: .22rem; padding: .75rem .9rem; }
 .link-preview-card-kicker { color: hsl(var(--site-accent-strong, var(--chat-accent))); font-size: .62rem; font-weight: 800; }
 .link-preview-card-title { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: .82rem; }

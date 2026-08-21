@@ -1,4 +1,6 @@
-export function LinkPreviewCard({ href = "", children }) {
+import { FileText } from "lucide-react";
+
+export function LinkPreviewCard({ href = "", children, imageUrl = "", description }) {
   const title = typeof children === "string" && children.trim() ? children : href;
   const isLiaraPage = /(?:^https?:\/\/)?(?:www\.)?liara\.ir\//i.test(href) || /\/documentation/i.test(href);
   return (
@@ -8,11 +10,11 @@ export function LinkPreviewCard({ href = "", children }) {
       rel={/^https?:\/\//i.test(href) ? "noreferrer" : undefined}
       className="link-preview-card"
     >
-      {isLiaraPage && <img src="/static/images/lia-avatar.png" alt="" className="link-preview-card-image" loading="lazy" />}
+      {imageUrl ? <img src={imageUrl} alt="" className="link-preview-card-image" loading="lazy" /> : isLiaraPage ? <span className="link-preview-card-image link-preview-card-icon"><FileText size={28} aria-hidden="true" /></span> : null}
       <span className="link-preview-card-body">
-        <span className="link-preview-card-kicker">صفحهٔ مرتبط</span>
+        <span className="link-preview-card-kicker">مقالهٔ مرتبط</span>
         <strong className="link-preview-card-title">{title}</strong>
-        <span className="link-preview-card-description">{isLiaraPage ? "مشاهدهٔ این صفحه در مستندات و پنل لیارا" : "برای مشاهدهٔ جزئیات این صفحه کلیک کنید."}</span>
+        <span className="link-preview-card-description">{description || (isLiaraPage ? "مشاهدهٔ مقاله در مستندات لیارا" : "برای مشاهدهٔ جزئیات این صفحه کلیک کنید.")}</span>
       </span>
     </a>
   );

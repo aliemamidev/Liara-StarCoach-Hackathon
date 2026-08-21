@@ -23,6 +23,8 @@ function serializeMessages(messages) {
         ...(message.metadata.liaAction ? { liaAction: message.metadata.liaAction } : {}),
         ...(message.metadata.screenshotReason ? { screenshotReason: message.metadata.screenshotReason } : {}),
         ...(message.metadata.ticketId ? { ticketId: message.metadata.ticketId } : {}),
+        ...(Array.isArray(message.metadata.documentationSources) ? { documentationSources: message.metadata.documentationSources.slice(0, 4) } : {}),
+        ...(Array.isArray(message.metadata.knowledgeSources) ? { knowledgeSources: message.metadata.knowledgeSources.slice(0, 4) } : {}),
       },
     } : {}),
     parts: (message.parts || []).flatMap((part) => {

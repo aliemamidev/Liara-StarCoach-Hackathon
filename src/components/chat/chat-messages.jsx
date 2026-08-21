@@ -1,7 +1,7 @@
 import { ArrowDown } from "lucide-react";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { Button } from "@/components/ui/button";
-import { ChatMessage } from "@/components/chat/chat-message";
+import { ChatMessage, LiaIdentity } from "@/components/chat/chat-message";
 
 export function ChatMessages({ messages, status, onRetry, playSound, isLive = false, scrollContainerRef, onScreenshot }) {
   const previousMessageCountRef = useRef(messages.length);
@@ -66,7 +66,7 @@ export function ChatMessages({ messages, status, onRetry, playSound, isLive = fa
         ))}
         {isStreaming && messages[messages.length - 1]?.role === "user" && (
           <div className="chat-message chat-message-assistant" role="status" aria-live="polite" aria-label="در حال پاسخ به پرسش شما">
-            <div className="chat-message-label">لیا</div>
+            <LiaIdentity />
             <div className="chat-thinking-status py-3">در حال پاسخ به پرسش شما<span aria-hidden="true" className="chat-thinking-dots">...</span></div>
           </div>
         )}

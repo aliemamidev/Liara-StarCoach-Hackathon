@@ -18,6 +18,10 @@ const markdownComponents = {
   a: ({ href = "", children }) => <LinkPreviewCard href={href}>{children}</LinkPreviewCard>,
 };
 
+export function LiaIdentity() {
+  return <div className="chat-message-identity"><span className="chat-message-avatar"><Image src="/static/images/lia-avatar.png" alt="آواتار لیا" width={48} height={48} /></span><span><strong>لیا</strong><small>دستیار لیارا</small></span></div>;
+}
+
 export function ChatMessage({ message, onRetry, playSound, isStreaming, isLive, onScreenshot }) {
   const content = messageText(message);
   const isUser = message.role === "user";
@@ -66,10 +70,14 @@ export function ChatMessage({ message, onRetry, playSound, isStreaming, isLive, 
 
   const renderedContent = isLive ? displayedContent : content;
   const canUseActions = !isUser && renderedContent && (!isLive || (!isRevealing && renderedContent === content)) && !isStreaming;
+  const sourceItems = [
+    ...(Array.isArray(message.metadata?.documentationSources) ? message.metadata.documentationSources : []),
+    ...(Array.isArray(message.metadata?.knowledgeSources) ? message.metadata.knowledgeSources : []),
+  ].filter((source, index, sources) => source?.url && sources.findIndex((item) => item.url === source.url) === index);
 
   return (
     <article className={isUser ? "chat-message chat-message-user" : "chat-message chat-message-assistant"}>
-      <div className="chat-message-label">{isUser ? "شما" : "لیا"}</div>
+      {isUser ? <div className="chat-message-label">شما</div> : <LiaIdentity />}
       <div className={`chat-message-content${isUser ? " chat-message-content-plain" : " chat-message-content-markdown"}`}>
         {renderedContent ? (
           isUser ? renderedContent : (
@@ -77,8 +85,9 @@ export function ChatMessage({ message, onRetry, playSound, isStreaming, isLive, 
               {renderedContent}
             </ReactMarkdown>
           )
-        ) : (isStreaming || message.metadata?.liaAction === "screenshot" ? "" : "پاسخی دریافت نشد.")}
+        ) : ""}
       </div>
+      {!isUser && sourceItems.length > 0 && <div className="chat-message-sources"><p>منابع پاسخ</p>{sourceItems.map((source) => <LinkPreviewCard key={source.url} href={source.url} imageUrl={source.imageUrl} description={source.description}>{source.title}</LinkPreviewCard>)}</div>}
       {!isUser && message.metadata?.liaAction === "screenshot" && onScreenshot && (
         <div className="mt-3 rounded-2xl border border-[hsl(var(--chat-accent)/.25)] bg-[hsl(var(--chat-accent)/.07)] p-3">
           <p className="text-xs leading-6 text-[hsl(var(--chat-text))]">{message.metadata.screenshotReason || "عکس از صفحه به تشخیص دقیق کمک می‌کند."}</p>

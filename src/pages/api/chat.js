@@ -7,8 +7,8 @@ import {
 } from "ai";
 import { randomUUID } from "node:crypto";
 import { getAiConfig, isAiConfigured } from "@/lib/ai-config";
-import { formatDocumentationContext, formatDocumentationSources } from "@/lib/docs-search";
-import { formatKnowledgeContext, formatKnowledgeSources } from "@/lib/lia-brain";
+import { formatDocumentationContext, toPublicDocumentationHit } from "@/lib/docs-search";
+import { formatKnowledgeContext } from "@/lib/lia-brain";
 import { CONTACT_REQUEST_MESSAGE, CONTACT_STAGE, createOrReuseEscalation, parseGuestContact } from "@/lib/lia-escalations";
 import { prisma } from "@/lib/prisma";
 import { getChatOwner } from "@/lib/chat-owner";
@@ -33,6 +33,19 @@ function pipeStaticMessage(response, messages, message, stage, metadata = {}) {
   });
 
   return pipeUIMessageStreamToResponse({ response, stream });
+}
+
+function sourceMetadata(plan) {
+  const documentationSources = (plan.hits || []).map(toPublicDocumentationHit).filter(Boolean).slice(0, 4);
+  const knowledgeSources = (plan.brainHits || []).slice(0, 2).map((entry) => ({
+    title: entry.question,
+    url: entry.sourceRefs?.find?.((source) => source?.url)?.url || "/documentation",
+    description: "دانش تأییدشدهٔ لیارا",
+  }));
+  return {
+    ...(documentationSources.length ? { documentationSources } : {}),
+    ...(knowledgeSources.length ? { knowledgeSources } : {}),
+  };
 }
 
 function modelMessages(messages) {
@@ -137,7 +150,7 @@ export default async function handler(req, res) {
       if (isUnsafeLiaDraft(entry.answer)) return await pipeEscalation(res, messages, chatId, plan);
       await prisma.knowledgeEntry.update({ where: { id: entry.id }, data: { usageCount: { increment: 1 } } }).catch(() => {});
       const answer = entry.answer.trim().startsWith("## پاسخ") ? entry.answer.trim() : `## پاسخ\n\n${entry.answer.trim()}`;
-      return await pipeStaticMessage(res, messages, `${answer}${plan.includeSources === false ? "" : formatKnowledgeSources([entry])}`, plan.stage);
+      return await pipeStaticMessage(res, messages, answer, plan.stage, sourceMetadata(plan));
     }
 
     const config = getAiConfig();
@@ -159,19 +172,18 @@ export default async function handler(req, res) {
     if (!validateLiaDraft(answer)) {
       return await pipeEscalation(res, messages, chatId, plan);
     }
-    const finalText = plan.mode === LIA_STAGES.ANSWER
-      ? `${answer.trim()}${plan.includeSources === false ? "" : `${formatKnowledgeSources(plan.brainHits || [])}${formatDocumentationSources(plan.hits || [])}`}`
-      : answer.trim();
+    const finalText = answer.trim();
+    const responseMetadata = sourceMetadata(plan);
 
     const stream = createUIMessageStream({
       originalMessages: messages,
       async execute({ writer }) {
         const id = globalThis.crypto?.randomUUID?.() || `lia-${Date.now()}`;
-        writer.write({ type: "start", messageMetadata: { liaStage: plan.stage } });
+        writer.write({ type: "start", messageMetadata: { liaStage: plan.stage, ...responseMetadata } });
         writer.write({ type: "text-start", id });
         writer.write({ type: "text-delta", id, delta: finalText });
         writer.write({ type: "text-end", id });
-        writer.write({ type: "finish", messageMetadata: { liaStage: plan.stage } });
+        writer.write({ type: "finish", messageMetadata: { liaStage: plan.stage, ...responseMetadata } });
       },
     });
     await pipeUIMessageStreamToResponse({

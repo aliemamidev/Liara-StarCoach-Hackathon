@@ -116,6 +116,40 @@ model KnowledgeEntry {
   @@index([sourceType])
 }
 
+model KnowledgeDocument {
+  id          String            @id @default(cuid())
+  sourcePath  String            @unique
+  title       String
+  url         String?
+  imageUrl    String?
+  rawContent  String            @db.Text
+  contentHash String
+  isActive    Boolean           @default(true)
+  createdAt   DateTime          @default(now())
+  updatedAt   DateTime          @updatedAt
+  chunks      KnowledgeChunk[]
+
+  @@index([isActive])
+  @@index([title])
+}
+
+model KnowledgeChunk {
+  id             String            @id @default(cuid())
+  documentId     String
+  section        String
+  content        String            @db.Text
+  normalizedText String            @db.Text
+  chunkIndex     Int
+  isActive       Boolean           @default(true)
+  createdAt      DateTime          @default(now())
+  updatedAt      DateTime          @updatedAt
+  document       KnowledgeDocument @relation(fields: [documentId], references: [id], onDelete: Cascade)
+
+  @@unique([documentId, chunkIndex])
+  @@index([documentId, chunkIndex])
+  @@index([isActive])
+}
+
 model EscalationTicket {
   id                   String           @id @default(cuid())
   chatId               String

@@ -110,7 +110,7 @@ function UserAvatar({ initials, tone = "blue", size = "md" }) {
 }
 
 function LiaAssistantBadge({ compact = false }) {
-  return <div className={`lia-assistant-badge${compact ? " lia-assistant-badge-compact" : ""}`}><span className="lia-assistant-avatar"><Image src="/static/images/lia-avatar.png" alt="آواتار لیا" width={compact ? 38 : 52} height={compact ? 38 : 52} /></span><span><strong>لیا</strong><small>AI Assistant</small></span></div>;
+  return <div className={`lia-assistant-badge${compact ? " lia-assistant-badge-compact" : ""}`}><span className="lia-assistant-avatar"><Image src="/static/images/lia-avatar.png" alt="آواتار لیا" width={compact ? 38 : 52} height={compact ? 38 : 52} /></span><span><strong>لیا</strong><small>دستیار لیارا</small></span></div>;
 }
 
 const adminMarkdownComponents = {

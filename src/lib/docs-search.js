@@ -14,8 +14,15 @@ const SEARCH_STOP_WORDS = new Set(["به", "در", "برای", "با", "از", "
 const DOCUMENTATION_HOST_PATTERN = /(?:^|\.)liara\.ir$/i;
 let documentsPromise;
 let onlineClient;
+let prismaPromise;
 
-function normalizeText(value) {
+async function getPrisma() {
+  if (!process.env.DATABASE_URL) return null;
+  prismaPromise ||= import("./prisma.js").then(({ prisma }) => prisma);
+  return prismaPromise;
+}
+
+export function normalizeText(value) {
   return String(value || "")
     .replace(/[يى]/g, "ی")
     .replace(/ك/g, "ک")
@@ -82,6 +89,12 @@ function docsUrl(content) {
   return isValidDocumentationUrl(originalLink) ? originalLink : null;
 }
 
+function imageUrlFrom(content) {
+  const image = String(content || "").match(/<img[^>]+src=["']([^"']+)["']/i)?.[1]
+    || String(content || "").match(/!\[[^\]]*\]\(([^)\s]+)(?:\s+[^)]*)?\)/i)?.[1];
+  return image && /^(?:https?:\/\/|\/)/i.test(image) ? image : null;
+}
+
 function splitTextSafely(text) {
   const chunks = [];
   let remaining = String(text || "").trim();
@@ -133,7 +146,7 @@ function splitIntoChunks(content, fallbackTitle) {
   return chunks.length ? chunks : [{ section: fallbackTitle, body: normalizeText(cleanMarkdown(content)) }];
 }
 
-async function loadDocuments() {
+export async function loadDocuments() {
   const allFiles = [];
   for (const root of DOCUMENTATION_ROOTS) {
     try { allFiles.push(...await findFiles(path.join(process.cwd(), root))); } catch { /* optional source root */ }
@@ -156,6 +169,8 @@ async function loadDocuments() {
         title,
         path: relativePath,
         url,
+        imageUrl: imageUrlFrom(raw),
+        rawContent: raw,
         section: chunk.section,
         body,
         titleTokens: tokens(title),
@@ -166,6 +181,16 @@ async function loadDocuments() {
     }
   }
   return documents;
+}
+
+function searchableDocument(document) {
+  return {
+    ...document,
+    titleTokens: tokens(document.title),
+    sectionTokens: tokens(document.section),
+    bodyTokens: new Set(tokens(document.body)),
+    pathTokens: tokens(document.path),
+  };
 }
 
 function scoreDocument(document, query, queryTokens) {
@@ -181,7 +206,32 @@ function scoreDocument(document, query, queryTokens) {
   if (normalizedQuery.length > 5 && document.body.toLocaleLowerCase("fa").includes(normalizedQuery)) score += 2;
   score += titleMatches * 2.2 + sectionMatches * 1.6 + pathMatches;
   score += documentationDomainBoost(document.path, query);
+  score += Number(document.dbScore || 0);
   return { document, score, coverage: matchingTokens.length, structuralMatches };
+}
+
+function rankDocuments(documents, query) {
+  const queryTokens = [...new Set(tokens(normalizeText(query)))];
+  const minimumCoverage = queryTokens.length <= 2
+    ? 1
+    : queryTokens.length <= 5
+      ? Math.ceil(queryTokens.length * 0.5)
+      : Math.max(2, Math.ceil(queryTokens.length * 0.35));
+  const ranked = documents
+    .map((document) => scoreDocument(searchableDocument(document), query, queryTokens))
+    .filter(({ coverage, structuralMatches }) => coverage >= minimumCoverage && (structuralMatches > 0 || coverage >= 2))
+    .sort((a, b) => b.score - a.score);
+  const bestScore = ranked[0]?.score || 0;
+  const selected = [];
+  const seenSections = new Set();
+  for (const item of ranked) {
+    const sectionKey = `${item.document.url || item.document.path}|${item.document.section}`;
+    if (item.score < bestScore * 0.45 || seenSections.has(sectionKey)) continue;
+    selected.push(item);
+    seenSections.add(sectionKey);
+    if (selected.length >= MAX_RESULTS) break;
+  }
+  return selected.map(({ document, score, coverage }) => ({ ...document, score, coverage }));
 }
 
 function documentationDomainBoost(relativePath, query) {
@@ -216,35 +266,50 @@ function expandQuery(query) {
 export async function searchDocumentation(query) {
   if (!query?.trim()) return { available: true, hits: [] };
   try {
+    const databaseHits = await searchDocumentationDatabase(query);
+    if (databaseHits) return { available: true, hits: rankDocuments(databaseHits, query) };
+  } catch {
+    // A not-yet-migrated database should not make the chat unusable.
+  }
+  try {
     documentsPromise ||= loadDocuments();
     const documents = await documentsPromise;
-    const queryTokens = [...new Set(tokens(normalizeText(query)))];
-    const minimumCoverage = queryTokens.length <= 2
-      ? 1
-      : queryTokens.length <= 5
-        ? Math.ceil(queryTokens.length * 0.5)
-        : Math.max(2, Math.ceil(queryTokens.length * 0.35));
-    const ranked = documents
-      .map((document) => scoreDocument(document, query, queryTokens))
-      .filter(({ coverage, structuralMatches }) => coverage >= minimumCoverage && (structuralMatches > 0 || coverage >= 2))
-      .sort((a, b) => b.score - a.score);
-    const bestScore = ranked[0]?.score || 0;
-    const selected = [];
-    const seenSections = new Set();
-    for (const item of ranked) {
-      const sectionKey = `${item.document.url || item.document.path}|${item.document.section}`;
-      if (item.score < bestScore * 0.45 || seenSections.has(sectionKey)) continue;
-      selected.push(item);
-      seenSections.add(sectionKey);
-      if (selected.length >= MAX_RESULTS) break;
-    }
-    return {
-      available: true,
-      hits: selected.map(({ document, score, coverage }) => ({ ...document, score, coverage })),
-    };
+    return { available: true, hits: rankDocuments(documents, query) };
   } catch {
     return { available: false, hits: [] };
   }
+}
+
+async function searchDocumentationDatabase(query) {
+  const prisma = await getPrisma();
+  if (!prisma) return null;
+  const indexedDocuments = await prisma.knowledgeDocument.count({ where: { isActive: true } });
+  if (!indexedDocuments) return null;
+  const expandedQuery = expandQuery(query);
+  const tsQuery = [...new Set(tokens(expandedQuery).map((term) => term.replace(/[^\p{L}\p{N}_]/gu, "")))].filter(Boolean).join(" | ");
+  if (!tsQuery) return [];
+  const rows = await prisma.$queryRaw`
+    SELECT
+      c."id",
+      c."section",
+      c."content" AS "body",
+      d."title",
+      d."sourcePath" AS "path",
+      d."url",
+      d."imageUrl",
+      ts_rank(
+        to_tsvector('simple', c."normalizedText"),
+        to_tsquery('simple', ${tsQuery})
+      ) AS "dbScore"
+    FROM "KnowledgeChunk" c
+    INNER JOIN "KnowledgeDocument" d ON d."id" = c."documentId"
+    WHERE c."isActive" = true
+      AND d."isActive" = true
+      AND to_tsvector('simple', c."normalizedText") @@ to_tsquery('simple', ${tsQuery})
+    ORDER BY "dbScore" DESC
+    LIMIT ${MAX_RESULTS * 12}
+  `;
+  return rows.map((row) => ({ ...row, dbScore: Number(row.dbScore || 0) }));
 }
 
 function getOnlineClient() {
@@ -354,6 +419,7 @@ export function toPublicDocumentationHit(hit) {
     path: hit.path,
     url: hit.url,
     section: hit.section,
+    imageUrl: hit.imageUrl || hit.src || null,
     platform: hit.platform,
     element: hit.element,
     type: hit.type,
