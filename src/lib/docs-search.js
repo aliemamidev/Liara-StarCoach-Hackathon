@@ -6,6 +6,7 @@ const MAX_RESULTS = 5;
 const MAX_BODY_LENGTH = 6500;
 const DOCUMENTATION_ROOTS = ["public/llms", "src/pages"];
 const ONLINE_INDEX = "docs";
+const DATABASE_QUERY_PATTERN = /(?:دیتابیس|پایگاه\s+داده|database|postgres(?:ql)?|mysql|mariadb|mongodb|mongo|redis|rabbitmq|elasticsearch|elastic\s*search|mssql|sql\s*server|sqlite|بکاپ|backup|بازیابی|restore|connection\s*pool|اتصال\s+به\s+(?:دیتابیس|پایگاه))/iu;
 let documentsPromise;
 let onlineClient;
 
@@ -75,7 +76,24 @@ function scoreDocument(document, query, queryTokens) {
   if (title.includes(normalizedQuery)) score += 3;
   if (body.includes(normalizedQuery)) score += 1.5;
   score += queryTokens.filter((token) => document.titleTokens.includes(token)).length * 0.35;
+  score += documentationDomainBoost(document.path, query);
   return { document, score, coverage: matchingTokens.length };
+}
+
+function documentationDomainBoost(relativePath, query) {
+  if (!DATABASE_QUERY_PATTERN.test(query)) return 0;
+  const normalizedPath = String(relativePath || "").replaceAll("\\", "/").toLowerCase();
+  if (normalizedPath.includes("/dbaas/")) return 2.5;
+  if (normalizedPath.includes("/references/cli/") && normalizedPath.includes("db")) return 1.75;
+  if (normalizedPath.includes("/paas/") && normalizedPath.includes("connect-to-db")) return 1.25;
+  if (normalizedPath.includes("/iaas/") && normalizedPath.includes("deploy-db")) return 0.75;
+  return 0;
+}
+
+function expandQuery(query) {
+  const normalizedQuery = normalizeText(query);
+  if (!DATABASE_QUERY_PATTERN.test(normalizedQuery)) return normalizedQuery;
+  return `${normalizedQuery} دیتابیس پایگاه داده dbaas database`;
 }
 
 export async function searchDocumentation(query) {
@@ -83,7 +101,8 @@ export async function searchDocumentation(query) {
   try {
     documentsPromise ||= loadDocuments();
     const documents = await documentsPromise;
-    const queryTokens = [...new Set(tokens(query))];
+    const expandedQuery = expandQuery(query);
+    const queryTokens = [...new Set(tokens(expandedQuery))];
     const hits = documents.map((document) => scoreDocument(document, query, queryTokens)).filter(({ coverage, score }) => coverage > 0 || score > 0).sort((a, b) => b.score - a.score).slice(0, MAX_RESULTS).map(({ document, score, coverage }) => ({ title: document.title, path: document.path, url: document.url, section: document.title, body: document.body.slice(0, MAX_BODY_LENGTH), score, coverage }));
     return { available: true, hits };
   } catch { return { available: false, hits: [] }; }
@@ -120,7 +139,7 @@ export async function searchDocumentationOnline(query) {
   const client = getOnlineClient();
   if (!client) return { available: false, hits: [] };
   try {
-    const result = await client.index(ONLINE_INDEX).search(query, { limit: MAX_RESULTS });
+    const result = await client.index(ONLINE_INDEX).search(expandQuery(query), { limit: MAX_RESULTS });
     return { available: true, hits: (result.hits || []).map(onlineHitToDocumentation) };
   } catch {
     return { available: false, hits: [] };
