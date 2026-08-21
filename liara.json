@@ -1,9 +1,3 @@
 {
-  "app": "starcoachali",
-  "port": 3000,
-  "team-id": "6a864ac0c33086fa25f44e55",
-  "build": {
-    "location": "iran"
-  },
-  "disks": []
+  "port": 3001
 }
