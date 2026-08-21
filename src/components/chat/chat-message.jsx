@@ -5,6 +5,7 @@ import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
 import { ImagePlus } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { LinkPreviewCard } from "@/components/link-preview-card";
 
 function messageText(message) {
   return (message.parts || [])
@@ -14,18 +15,7 @@ function messageText(message) {
 }
 
 const markdownComponents = {
-  a: ({ href = "", children, ...props }) => {
-    const isExternal = /^https?:\/\//i.test(href);
-    return (
-      <a
-        href={href}
-        {...props}
-        {...(isExternal ? { target: "_blank", rel: "noreferrer" } : {})}
-      >
-        {children}
-      </a>
-    );
-  },
+  a: ({ href = "", children }) => <LinkPreviewCard href={href}>{children}</LinkPreviewCard>,
 };
 
 export function ChatMessage({ message, onRetry, playSound, isStreaming, isLive, onScreenshot }) {
@@ -116,4 +106,3 @@ export function ChatMessage({ message, onRetry, playSound, isStreaming, isLive, 
 }
 
 export { messageText };
-

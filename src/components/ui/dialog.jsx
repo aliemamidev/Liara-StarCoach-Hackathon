@@ -15,7 +15,7 @@ export const DialogOverlay = React.forwardRef(({ className, ...props }, ref) => 
   return (
     <DialogPrimitive.Overlay
       ref={ref}
-      className={cn("fixed inset-0 z-50 bg-black/45 backdrop-blur-[2px]", className)}
+      className={cn("admin-dialog-overlay fixed inset-0 z-50 bg-black/45 backdrop-blur-[2px]", className)}
       {...props}
     />
   );
@@ -29,7 +29,7 @@ export const DialogContent = React.forwardRef(({ className, children, ...props }
       <DialogPrimitive.Content
         ref={ref}
         className={cn(
-          "fixed left-1/2 top-1/2 z-50 w-[calc(100%-2rem)] max-w-lg -translate-x-1/2 -translate-y-1/2 rounded-2xl border border-[hsl(var(--chat-border))] bg-[hsl(var(--chat-bg))] p-6 text-[hsl(var(--chat-text))] shadow-2xl",
+          "admin-dialog-content fixed left-1/2 top-1/2 z-50 w-[calc(100%-2rem)] max-w-lg -translate-x-1/2 -translate-y-1/2 rounded-2xl border border-[hsl(var(--chat-border))] bg-[hsl(var(--chat-bg))] p-6 text-[hsl(var(--chat-text))] shadow-2xl",
           className,
         )}
         {...props}
@@ -54,7 +54,6 @@ export const DialogTitle = ({ className, ...props }) => (
 export const DialogDescription = ({ className, ...props }) => (
   <DialogPrimitive.Description className={cn("text-sm leading-6 text-[hsl(var(--chat-muted))]", className)} {...props} />
 );
-
 
 
 

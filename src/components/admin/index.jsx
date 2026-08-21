@@ -49,6 +49,8 @@ import {
   Zap,
 } from "lucide-react";
 import { useTheme } from "next-themes";
+import ReactMarkdown from "react-markdown";
+import remarkGfm from "remark-gfm";
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuLabel, DropdownMenuSeparator, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
@@ -65,6 +67,7 @@ import {
 import { BrainPage } from "@/components/admin/brain-page";
 import { EscalationsPage } from "@/components/admin/escalations-page";
 import { ADMIN_TOPICS } from "@/lib/admin-topics";
+import { LinkPreviewCard } from "@/components/link-preview-card";
 
 const iconMap = {
   LayoutDashboard,
@@ -103,6 +106,18 @@ function Brand({ collapsed = false, onToggle }) {
 function UserAvatar({ initials, tone = "blue", size = "md" }) {
   const sizes = size === "sm" ? "h-8 w-8 text-[10px]" : "h-10 w-10 text-xs";
   return <span className={`inline-flex ${sizes} shrink-0 items-center justify-center rounded-xl font-bold ${toneClasses[tone].icon}`}>{initials}</span>;
+}
+
+function LiaAssistantBadge({ compact = false }) {
+  return <div className={`lia-assistant-badge${compact ? " lia-assistant-badge-compact" : ""}`}><span className="lia-assistant-avatar"><Image src="/static/images/lia-avatar.png" alt="آواتار لیا" width={compact ? 38 : 52} height={compact ? 38 : 52} /></span><span><strong>لیا</strong><small>AI Assistant</small></span></div>;
+}
+
+const adminMarkdownComponents = {
+  a: ({ href = "", children }) => <LinkPreviewCard href={href}>{children}</LinkPreviewCard>,
+};
+
+function AdminMarkdown({ children }) {
+  return <div className="admin-markdown"><ReactMarkdown remarkPlugins={[remarkGfm]} components={adminMarkdownComponents}>{String(children || "")}</ReactMarkdown></div>;
 }
 
 function StatusBadge({ status, children }) {
@@ -186,7 +201,7 @@ function TopicsCard({ onNavigate, items = [] }) {
 
 function SystemPulse({ system = {} }) {
   const rows = [{ label: "پایگاه داده PostgreSQL", status: system.database === "connected" ? "متصل" : "نامشخص", ok: system.database === "connected" }, { label: "سرویس لیا", status: system.assistant === "configured" ? "آماده" : "نامشخص", ok: system.assistant === "configured" }, { label: "جست‌وجوی وب", status: system.webSearch === "enabled" ? "فعال" : "خاموش", ok: system.webSearch === "enabled" }, { label: "اتصال لحظه‌ای", status: system.realtimeConnected === false ? "قطع" : "متصل", ok: system.realtimeConnected !== false }];
-  return <Card className="p-5"><div className="mb-5 flex items-center justify-between"><div><p className="text-[11px] font-bold text-[#8b99ab]">وضعیت سیستم</p><h2 className="mt-1 text-[17px] font-extrabold text-[#1a2940]">سرویس‌های اصلی</h2></div><Database size={20} className="text-[#5273a2]" /></div><div className="space-y-2">{rows.map((row) => <div key={row.label} className="flex items-center justify-between rounded-xl border border-[#edf0f4] px-3 py-3"><span className="flex items-center gap-2 text-[11px] font-bold text-[#4f5f74]"><span className={`h-2.5 w-2.5 rounded-full ${row.ok ? "bg-[#19a88e]" : "bg-[#e08c38]"}`} />{row.label}</span><span className={`text-[10px] font-extrabold ${row.ok ? "text-[#16835c]" : "text-[#b66b0b]"}`}>{row.status}</span></div>)}</div></Card>;
+  return <Card className="p-5"><div className="mb-5 flex items-center justify-between gap-3"><div><p className="text-[11px] font-bold text-[hsl(var(--site-muted))]">وضعیت سیستم</p><h2 className="mt-1 text-[17px] font-extrabold text-[hsl(var(--site-text))]">سرویس‌های اصلی</h2></div><LiaAssistantBadge compact /></div><div className="space-y-2">{rows.map((row) => <div key={row.label} className="flex items-center justify-between rounded-xl border border-[hsl(var(--site-border))] px-3 py-3"><span className="flex items-center gap-2 text-[11px] font-bold text-[hsl(var(--site-text))]"><span className={`h-2.5 w-2.5 rounded-full ${row.ok ? "bg-[hsl(var(--site-accent-strong))]" : "bg-orange-400"}`} />{row.label}</span><span className={`text-[10px] font-extrabold ${row.ok ? "text-emerald-600 dark:text-emerald-300" : "text-orange-600 dark:text-orange-300"}`}>{row.status}</span></div>)}</div></Card>;
 }
 
 function RecentMessages({ onSelect, onNavigate, items = [] }) {
@@ -245,7 +260,7 @@ function UsersPage({ items = [], userSummary = {} }) {
 }
 
 function ToggleRow({ icon: RowIcon, title, description, checked, onChange }) {
-  return <div className="flex items-center gap-4 border-b border-[#edf0f4] py-4 last:border-0"><span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-[#eff4fb] text-[#5c7db7]"><RowIcon size={18} /></span><div className="min-w-0 flex-1"><p className="text-[12px] font-extrabold text-[#33435a]">{title}</p><p className="mt-1 text-[10px] leading-5 text-[#8a97a8]">{description}</p></div><button type="button" role="switch" aria-checked={checked} onClick={() => onChange(!checked)} className={`relative flex h-11 w-12 shrink-0 items-center rounded-full transition ${checked ? "bg-[#18a996]" : "bg-[#d8e0e9]"}`}><span className={`absolute top-3 h-5 w-5 rounded-full bg-white shadow-sm transition ${checked ? "right-1" : "right-6"}`} /></button></div>;
+  return <div className="flex items-center gap-4 border-b border-[hsl(var(--site-border))] py-4 last:border-0"><span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-[hsl(var(--site-accent)/.12)] text-[hsl(var(--site-accent-strong))]"><RowIcon size={18} /></span><div className="min-w-0 flex-1"><p className="text-[12px] font-extrabold text-[hsl(var(--site-text))]">{title}</p><p className="mt-1 text-[10px] leading-5 text-[hsl(var(--site-muted))]">{description}</p></div><button type="button" role="switch" aria-checked={checked} onClick={() => onChange(!checked)} className={`admin-toggle relative flex h-11 w-12 shrink-0 items-center rounded-full transition ${checked ? "is-on" : "is-off"}`}><span className="absolute top-3 h-5 w-5 rounded-full bg-white shadow-sm transition" /></button></div>;
 }
 
 function SettingsPage() {
@@ -263,6 +278,12 @@ function LegacyConversationDialog({ message, onClose }) {
 function ConversationDialog({ message, onClose }) {
   const messages = message?.messages || [];
   return <Dialog open={Boolean(message)} onOpenChange={(open) => !open && onClose()}><DialogContent className="max-h-[calc(100dvh-3rem)] w-[min(960px,calc(100vw-2rem))] overflow-hidden border-[#e4eaf1] bg-white p-0 text-right shadow-[0_24px_80px_rgba(27,47,76,.2)]"><DialogHeader className="sticky top-0 z-10 border-b border-[#edf0f4] bg-[#fbfcfe] p-6"><div className="flex items-start justify-between gap-3"><div className="min-w-0"><p className="text-[10px] font-bold tracking-[0.12em] text-[#8b99ab]">جزئیات مکالمه</p><DialogTitle className="mt-1 truncate text-xl font-extrabold text-[#1a2940]">{message?.user || "مکالمه"}</DialogTitle><DialogDescription className="mt-1 text-[11px] text-[#8390a2]">{message?.time} · {message?.topic}</DialogDescription></div>{message && <StatusBadge status={message.status}>{message.statusLabel}</StatusBadge>}</div></DialogHeader>{message && <div className="max-h-[calc(100dvh-10rem)] space-y-4 overflow-y-auto p-6">{message.loading ? <div className="flex min-h-48 items-center justify-center text-sm font-bold text-[#718198]">در حال دریافت مکالمه…</div> : messages.length > 0 ? messages.map((item, index) => <div key={`${item.id || item.createdAt || "message"}-${index}`} className={`max-w-[82%] rounded-[22px] p-4 ${item.role === "assistant" ? "mr-auto border border-[#dcefe9] bg-[#f4fcfa]" : "ml-auto bg-[#f5f7fb]"}`}><div className={`mb-2 flex items-center gap-2 text-[10px] font-bold ${item.role === "assistant" ? "text-[#159787]" : "text-[#8997a8]"}`}>{item.role === "assistant" ? <Bot size={15} /> : <UserRound size={15} />}{item.role === "assistant" ? "لیا" : "کاربر"}</div><p className={`whitespace-pre-wrap break-words text-[14px] leading-7 ${item.role === "assistant" ? "text-[#41665f]" : "font-semibold text-[#34445b]"}`}>{item.text || item.content || ""}</p></div>) : <><div className="ml-auto max-w-[82%] rounded-[22px] bg-[#f5f7fb] p-4"><div className="mb-2 flex items-center gap-2 text-[10px] font-bold text-[#8997a8]"><UserRound size={15} />کاربر</div><p className="whitespace-pre-wrap break-words text-[14px] font-semibold leading-7 text-[#34445b]">{message.question}</p></div><div className="mr-auto max-w-[82%] rounded-[22px] border border-[#dcefe9] bg-[#f4fcfa] p-4"><div className="mb-2 flex items-center gap-2 text-[10px] font-bold text-[#159787]"><Bot size={15} />لیا</div><p className="whitespace-pre-wrap break-words text-[14px] leading-7 text-[#41665f]">{message.response}</p></div></>}<div className="flex flex-wrap items-center justify-between gap-3 border-t border-[#edf0f4] pt-4"><div className="flex items-center gap-2 text-[10px] text-[#8b99ab]"><Database size={15} />منبع: پایگاه داده عملیاتی</div><Button variant="outline" size="sm" className="min-h-11 border-[#e3eaf1] text-[10px]" onClick={onClose}><X size={15} />بستن</Button></div></div>}</DialogContent></Dialog>;
+}
+
+function ConversationDialogV2({ message, onClose }) {
+  const messages = message?.messages || [];
+  const renderMessage = (item) => <AdminMarkdown>{item.text || item.content || ""}</AdminMarkdown>;
+  return <Dialog open={Boolean(message)} onOpenChange={(open) => !open && onClose()}><DialogContent className="admin-conversation-dialog text-right"><DialogHeader className="admin-conversation-header"><div className="min-w-0"><p className="text-[10px] font-bold tracking-[0.12em] text-[hsl(var(--site-muted))]">جزئیات مکالمه</p><DialogTitle className="mt-1 truncate text-lg font-extrabולד text-[hsl(var(--site-text))]">{message?.user || "مکالمه"}</DialogTitle><DialogDescription className="mt-1 text-[11px]">{message?.time} · {message?.topic}</DialogDescription></div>{message && <StatusBadge status={message.status}>{message.statusLabel}</StatusBadge>}</DialogHeader>{message && <div className="admin-conversation-body">{message.loading ? <div className="flex min-h-40 items-center justify-center text-sm font-bold text-[hsl(var(--site-muted))]">در حال دریافت مکالمه…</div> : messages.length > 0 ? messages.map((item, index) => <div key={`${item.id || item.createdAt || "message"}-${index}`} className={`admin-conversation-message ${item.role === "assistant" ? "is-assistant" : "is-user"}`}><div className="mb-2 flex items-center gap-2 text-[10px] font-bold">{item.role === "assistant" ? <Bot size={15} /> : <UserRound size={15} />}{item.role === "assistant" ? "لیا" : "کاربر"}</div>{renderMessage(item)}</div>) : <><div className="admin-conversation-message is-user"><div className="mb-2 flex items-center gap-2 text-[10px] font-bold"><UserRound size={15} />کاربر</div><AdminMarkdown>{message.question}</AdminMarkdown></div><div className="admin-conversation-message is-assistant"><div className="mb-2 flex items-center gap-2 text-[10px] font-bold"><Bot size={15} />لیا</div><AdminMarkdown>{message.response}</AdminMarkdown></div></>}<div className="admin-conversation-footer"><span><Database size={15} />منبع: پایگاه داده عملیاتی</span><Button variant="outline" size="sm" onClick={onClose}>بستن</Button></div></div>}</DialogContent></Dialog>;
 }
 
 function LegacyNotificationCenter({ notifications, onOpen, onMarkRead }) {
@@ -460,7 +481,7 @@ function AdminDashboardShell({ session }) {
       <div className={`${sidebarCollapsed ? "lg:pr-20" : "lg:pr-64"} transition-[padding] duration-[220ms] ease-out`}><AdminHeader onMenu={() => setMobileOpen(true)} onNavigate={navigate} onProfile={() => setProfileOpen(true)} onRefresh={refresh} onLogout={logout} user={user} notifications={notifications} onNotificationOpen={openNotification} /><main className="px-4 py-6 sm:px-7 lg:px-10 lg:py-8"><div className="mx-auto max-w-[1500px]"><div className="mb-7 flex flex-col justify-between gap-5 md:flex-row md:items-end"><div>{meta.eyebrow && <div className="mb-3 flex items-center gap-2 text-[10px] font-bold tracking-[0.12em] text-[#7e8da1]"><span className="h-1.5 w-1.5 rounded-full bg-[#18a996]" />{meta.eyebrow}</div>}<h1 className="text-[25px] font-extrabold tracking-tight text-[#1b2b43] sm:text-[30px]">{activeSection === "dashboard" ? `سلام، ${user.name}` : meta.title}</h1><p className="mt-2 max-w-2xl text-xs leading-6 text-[#8390a2]">{meta.description}</p></div><div className="flex items-center gap-2"><span className="hidden text-[10px] font-semibold text-[#9aa6b7] sm:inline">آخرین به‌روزرسانی: {lastUpdated}</span><Button variant="outline" size="sm" className="h-10 border-[#e2e8f0] bg-white text-xs text-[#5f6f84]" onClick={refresh}><RotateCcw size={14} />به‌روزرسانی</Button></div></div>{loading ? <div className="grid gap-5"><Card className="flex min-h-[420px] items-center justify-center"><div className="text-center"><span className="mx-auto flex h-11 w-11 animate-pulse items-center justify-center rounded-2xl bg-[#e9f0fb] text-[#5b7fc1]"><Wifi size={20} /></span><p className="mt-4 text-sm font-bold text-[#54647a]">در حال دریافت داده‌ها...</p><p className="mt-1 text-[11px] text-[#9aa6b7]">این صفحه لحظه‌ای دیگر آماده است.</p></div></Card></div> : loadError ? <Card className="flex min-h-[420px] items-center justify-center p-6"><div className="max-w-md text-center"><span className="mx-auto flex h-11 w-11 items-center justify-center rounded-2xl bg-[#fff0f1] text-[#c44952]"><XCircle size={20} /></span><p className="mt-4 text-sm font-bold text-[#54647a]">اطلاعات پنل در دسترس نیست</p><p className="mt-2 text-xs leading-6 text-[#9aa6b7]">{loadError}</p><Button className="mt-5 h-11 bg-[#1c3150] text-xs hover:bg-[#29476f]" onClick={refresh}><RotateCcw size={14} />تلاش مجدد</Button></div></Card> : activeSection === "dashboard" ? <DashboardPage data={adminData} onSelect={openConversation} onNavigate={navigate} /> : activeSection === "messages" ? <MessagesPage items={adminData.messages} onSelect={openConversation} /> : activeSection === "unanswered" ? <UnansweredPage items={unknownItems} onResolve={(id) => setUnknownItems((current) => current.filter((item) => item.id !== id))} onSelect={openConversation} /> : activeSection === "escalations" ? <EscalationsPage /> : activeSection === "brain" ? <BrainPage /> : activeSection === "analytics" ? <AnalyticsPage analytics={adminData.analytics} /> : activeSection === "users" ? <UsersPage items={adminData.users} userSummary={adminData.userSummary} /> : <SettingsPage />}</div></main></div>
     </div>
     {toastNotification && <Toast notification={toastNotification} onOpen={() => openNotification(toastNotification)} onDismiss={() => setToastNotification(null)} />}
-    <ConversationDialog message={selectedMessage} onClose={() => setSelectedMessage(null)} />
+    <ConversationDialogV2 message={selectedMessage} onClose={() => setSelectedMessage(null)} />
     <ProfileDialog open={profileOpen} onClose={() => setProfileOpen(false)} user={user} onUpdated={(nextUser) => setUser((current) => ({ ...current, ...nextUser }))} />
   </>;
 }

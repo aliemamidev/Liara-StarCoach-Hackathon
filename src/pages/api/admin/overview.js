@@ -33,9 +33,12 @@ function weekSeries(messages, chats) {
 }
 
 function trendDirection(values) {
-  const completeDays = values.length > 1 ? values.slice(0, -1) : values;
-  const previous = completeDays.slice(-6, -3).reduce((sum, value) => sum + value, 0) / 3;
-  const latest = completeDays.slice(-3).reduce((sum, value) => sum + value, 0) / 3;
+  const completeDays = values.length >= 4 ? values.slice(0, -1) : values;
+  const split = Math.max(1, Math.floor(completeDays.length / 2));
+  const previousValues = completeDays.slice(0, split);
+  const latestValues = completeDays.slice(split);
+  const previous = previousValues.reduce((sum, value) => sum + Number(value || 0), 0) / previousValues.length;
+  const latest = latestValues.reduce((sum, value) => sum + Number(value || 0), 0) / Math.max(latestValues.length, 1);
   if (previous === 0 && latest === 0) return "flat";
   if (previous === 0) return latest > 0 ? "up" : "flat";
   const change = (latest - previous) / previous;
