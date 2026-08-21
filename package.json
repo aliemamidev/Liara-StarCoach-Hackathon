@@ -6,7 +6,7 @@
     "dev": "node server.js dev",
     "generate-llms": "npm --prefix mdx-to-md-converter ci && npm --prefix mdx-to-md-converter run convert",
     "generate-llms:pre-commit": "npm --prefix mdx-to-md-converter run pre-commit && git add public/llms public/all-links-llms.txt",
-    "build": "npm run sitemap && npm run fetch:models && next build",
+    "build": "npm run db:generate && npm run sitemap && npm run fetch:models && next build",
     "start": "node server.js production",
     "lint": "eslint \"src/components/chat/*.jsx\" \"src/components/admin/*.jsx\" \"src/components/login-form.jsx\" \"src/components/ui/*.jsx\" \"src/hooks/*.js\" \"src/lib/*.js\" \"src/pages/api/*.js\" \"src/pages/docs/*.js\" \"src/pages/index.js\" \"src/pages/admin/index.js\" \"src/pages/_app.js\" \"src/pages/_document.js\"",
     "sitemap": "node sitemap/generate.js",

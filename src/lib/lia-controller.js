@@ -117,6 +117,7 @@ const TECHNICAL_SYMPTOM_PATTERN = /(?:برنامه\s*(?:م|ام|من)|اپلیک
 
 const GENERAL_TECHNICAL_EXPLANATION_PATTERN = /(?:چیست|چیستند|یعنی چه|چه تفاوتی|تفاوت|تعریف|معنی|چگونه کار می\s*کند|چطور کار می\s*کند|چطور(?:\s+\S+){0,8}\s*(?:ایجاد|بساز|ساخت)\s*(?:کنم|کنیم)?|چگونه(?:\s+\S+){0,8}\s*(?:ایجاد|بساز|ساخت)\s*(?:کنم|کنیم)?|توضیح بده|معرفی کن|what is|what are|difference between|how does .* work)/iu;
 const LIARA_SPECIFIC_PATTERN = /(?:لیارا|liara|پنل|قیمت|پلن|صورتحساب|فاکتور|سرویس لیارا|مستندات لیارا|حساب کاربری|دامنه\s*من|دامنه\s*ام|اپلیکیشن\s*من|برنامه\s*ام|در لیارا|روی لیارا)/iu;
+const LIARA_DOCUMENTED_TECHNOLOGY_PATTERN = /(?:postgres(?:ql)?|mysql|mongodb|redis|rabbitmq|prisma|sql|dbaas|paas|iaas|node(?:\.js)?|next(?:\.js)?|nest(?:\.js)?|nestjs|react|docker|python|php|github|gitlab|dns|ssl|tls|cors|websocket|cron|متغیر\s+محیطی|environment\s+variable|vercel\s+ai|ai\s+sdk|هوش\s+مصنوعی|چت‌?بات)/iu;
 export function isLikelyInScope(query) {
   const normalizedQuery = normalizeText(query);
   return IN_SCOPE_PATTERN.test(normalizedQuery) || TECHNICAL_SYMPTOM_PATTERN.test(normalizedQuery);
@@ -126,7 +127,8 @@ function isGeneralTechnicalQuery(query) {
   const normalizedQuery = normalizeText(query);
   return isLikelyInScope(normalizedQuery)
     && GENERAL_TECHNICAL_EXPLANATION_PATTERN.test(normalizedQuery)
-    && !LIARA_SPECIFIC_PATTERN.test(normalizedQuery);
+    && !LIARA_SPECIFIC_PATTERN.test(normalizedQuery)
+    && !LIARA_DOCUMENTED_TECHNOLOGY_PATTERN.test(normalizedQuery);
 }
 
 const VISUAL_DIAGNOSTIC_PATTERN = /(?:خطا|ارور|کار نمی\s*(?:کند|کنه)|درست اجرا نمی\s*شود|باگ|رفتار غیرمنتظره|نمایش داده نمی\s*شود|ظاهر خراب|صفحه سفید|صفحه سیاه|پیام خطا|اسکرین‌?شات|screenshot|error|bug|not working|unexpected)/iu;
@@ -148,6 +150,7 @@ function detectedService(query) {
 
 function hasGoal(query) {
   const normalized = normalizeText(query);
+  if (GENERAL_TECHNICAL_EXPLANATION_PATTERN.test(normalized) && tokens(normalized).length >= 2) return true;
   return tokens(normalized).length >= 4 && !/^(?:کمک|مشکل دارم|خطا|ارور|help|error)$/iu.test(normalized);
 }
 
@@ -184,6 +187,7 @@ export async function createLiaControllerPlan(messages) {
   const query = latestUserText(messages);
   const priorStage = previousStage(messages);
   const conversation = allUserText(messages);
+  const retrievalQuery = `${conversation} ${query}`.trim();
 
   if (!isLikelyInScope(query)) {
     return { mode: LIA_STAGES.OUT_OF_SCOPE, stage: LIA_STAGES.OUT_OF_SCOPE, query, hits: [] };
@@ -218,9 +222,9 @@ export async function createLiaControllerPlan(messages) {
   let brainHits = [];
   try {
     brainHits = await searchKnowledge(query);
-    if (!isStrongKnowledgeEvidence(brainHits, query) && conversation !== query) brainHits = await searchKnowledge(conversation);
+    if (!isStrongKnowledgeEvidence(brainHits, query) && conversation !== query) brainHits = await searchKnowledge(retrievalQuery);
   } catch { brainHits = []; }
-  if (isStrongKnowledgeEvidence(brainHits, query) || isStrongKnowledgeEvidence(brainHits, conversation)) {
+  if (isStrongKnowledgeEvidence(brainHits, query) || isStrongKnowledgeEvidence(brainHits, retrievalQuery)) {
     return { mode: LIA_STAGES.ANSWER, stage: LIA_STAGES.ANSWER, query, hits: [], brainHits, searchTrace };
   }
 
@@ -236,7 +240,7 @@ export async function createLiaControllerPlan(messages) {
     hits = mergeHits(hits, online.hits);
   }
 
-  if (isStrongEvidence(hits, query)) {
+  if (isStrongEvidence(hits, retrievalQuery)) {
     return {
       mode: LIA_STAGES.ANSWER,
       stage: LIA_STAGES.ANSWER,
@@ -251,7 +255,7 @@ export async function createLiaControllerPlan(messages) {
   const web = await searchWeb(`${conversation} ${query}`);
   if (web.available) hits = mergeHits(hits, web.hits);
   documentationAvailable = documentationAvailable || web.available;
-  if (isStrongEvidence(hits, query)) {
+  if (isStrongEvidence(hits, retrievalQuery)) {
     return { mode: LIA_STAGES.ANSWER, stage: LIA_STAGES.ANSWER, query, hits, brainHits, searchTrace };
   }
 
