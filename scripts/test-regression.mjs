@@ -147,12 +147,19 @@ test("API intent matrix stays grounded on the API reference", async () => {
     "api",
     "Liara API",
     "API لیارا",
+    "API لیارا چیه؟",
     "چطوری api بگیرم؟",
-    "میخوام api بگیرم",
+    "چطور API بگیرم؟",
     "دریافت api",
     "سرویس api",
-    "مستندات API لیارا",
-    "نحوه استفاده از API لیارا",
+    "API key از کجا بیارم؟",
+    "توکن API چیه؟",
+    "چطور از API لیارا استفاده کنم؟",
+    "چطوری با API لیارا کار کنم؟",
+    "API رو چطور استفاده کنم؟",
+    "روش استفاده از API لیارا چیه؟",
+    "مستندات استفاده از API لیارا",
+    "API لیارا چطور کار می‌کنه؟",
   ];
   for (const query of queries) {
     const response = await fetch(`${baseUrl}/api/docs-search/?q=${encodeURIComponent(query)}`);
@@ -179,6 +186,36 @@ test("follow-up context is used only when the new question needs it", async () =
   assert.match(conversation.body, /"liaStage":"answer"/);
   assert.match(conversation.body, /references\/api\/about/);
   assert.doesNotMatch(conversation.body, /پرسش تکمیلی|ارسال برای بررسی/);
+});
+
+test("cross-topic documentation retrieval keeps sources in the requested domain", async () => {
+  const cases = [
+    ["deploy", /(?:paas|references\/cli)/i],
+    ["دامنه", /paas\/domains/i],
+    ["DNS", /(?:dns-management-system|domains)/i],
+    ["پستگرس", /dbaas\/postgresql/i],
+    ["Redis backup", /dbaas\/redis/i],
+    ["Docker", /docker/i],
+    ["CLI", /references\/cli/i],
+    ["اتصال ssh", /iaas\//i],
+    ["object storage", /object-storage/i],
+    ["cron", /set-cron-job/i],
+    ["متغیر محیطی", /set-envs|details\/envs/i],
+    ["لاگ", /logs|see-app-logs/i],
+    ["monitoring", /health-check|observations/i],
+    ["authentication", /login|auth/i],
+    ["billing", /receive-invoice|invoice/i],
+    ["پروژه", /references\/team|project/i],
+    ["troubleshooting", /error|fix-common-errors/i],
+  ];
+  for (const [query, expectedPath] of cases) {
+    const response = await fetch(`${baseUrl}/api/docs-search/?q=${encodeURIComponent(query)}`);
+    assert.equal(response.status, 200, query);
+    const hits = (await response.json()).hits || [];
+    assert.ok(hits.length > 0, query);
+    assert.match(hits[0].path, expectedPath, query);
+    assert.ok(hits.every((hit) => /^https:\/\/docs\.liara\.ir\//.test(hit.url)), query);
+  }
 });
 
 test("context redacts secrets and citations reject fabricated URLs", () => {

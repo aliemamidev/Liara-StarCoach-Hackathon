@@ -11,7 +11,7 @@ const DOCUMENTATION_ROOTS = ["public/llms"];
 const ONLINE_INDEX = "docs";
 const DATABASE_QUERY_PATTERN = /(?:دیتابیس|پایگاه\s+داده|database|postgres(?:ql)?|mysql|mariadb|mongodb|mongo|redis|rabbitmq|elasticsearch|elastic\s*search|mssql|sql\s*server|sqlite|بکاپ|backup|بازیابی|restore|connection\s*pool|اتصال\s+به\s+(?:دیتابیس|پایگاه))/iu;
 const SEARCH_STOP_WORDS = new Set(["به", "در", "برای", "با", "از", "و", "را", "یک", "این", "آن", "برنامه", "روش", "است", "های", "کردن"]);
-const QUERY_NOISE_WORDS = new Set(["چطور", "چطوری", "چگونه", "نحوه", "میخوام", "می", "خوام", "بگیرم", "گرفتن", "دریافت", "استفاده", "کنم", "کنیم", "میشه", "شود", "کنه"]);
+const QUERY_NOISE_WORDS = new Set(["چطور", "چطوری", "چگونه", "نحوه", "میخوام", "می", "خوام", "بگیرم", "گرفتن", "دریافت", "استفاده", "کنم", "کنیم", "میشه", "شود", "کنه", "کند", "چیست", "چیه", "یعنی", "مستندات", "راهنما", "کجا", "کار", "رو", "بیارم", "بسازم", "بساز", "ساختن"]);
 const DOCUMENTATION_HOST_PATTERN = /(?:^|\.)liara\.ir$/i;
 let documentsPromise;
 let onlineClient;
@@ -41,9 +41,24 @@ const QUERY_SYNONYMS = [
   [/\bdeploy(?:ment)?\b|استقرار|دیپلوی/iu, "deploy deployment استقرار دیپلوی"],
   [/\bnode(?:\.js)?\b|نود/iu, "node nodejs node.js نود"],
   [/\bapi\b|\bapi key\b|کلید\s+(?:دسترسی|api)/iu, "api api-key http endpoint token کلید دسترسی"],
+  [/\btoken\b|توکن/iu, "token توکن api-key کلید دسترسی"],
   [/\bcli\b|خط\s*فرمان/iu, "cli command line خط فرمان"],
   [/\bdocker\b|داکر/iu, "docker container کانتینر داکر"],
   [/\bssh\b/iu, "ssh سرور دسترسی"],
+  [/\bdomain\b|دامنه/iu, "domain domains دامنه dns رکورد"],
+  [/\bdns\b|دی\s*ان\s*اس/iu, "dns domain domains رکورد"],
+  [/postgres(?:ql)?|پستگرس/iu, "postgres postgresql پستگرس database دیتابیس"],
+  [/\bredis\b|ردیس/iu, "redis ردیس database دیتابیس"],
+  [/\bbackup\b|بکاپ|پشتیبان|restore|بازیابی/iu, "backup restore بکاپ پشتیبان بازیابی"],
+  [/\blog(?:s)?\b|لاگ/iu, "log logs لاگ"],
+  [/\bmonitor(?:ing)?\b|مانیتورینگ|نظارت/iu, "monitor monitoring health check metrics مانیتورینگ سلامت"],
+  [/\bauth(?:entication)?\b|احراز\s+هویت|ورود/iu, "auth authentication احراز هویت ورود login"],
+  [/\bbilling\b|صورتحساب|فاکتور/iu, "billing invoice صورتحساب فاکتور پرداخت"],
+  [/\bproject(?:s)?\b|پروژه/iu, "project projects پروژه اپلیکیشن application"],
+  [/\bconnect(?:ion)?\b|وصل|اتصال/iu, "connect connection وصل اتصال"],
+  [/\bapp(?:lication)?s?\b|اپلیکیشن|برنامه/iu, "app apps application applications اپلیکیشن برنامه"],
+  [/\btroubleshoot(?:ing)?\b|عیب\s*یابی|خطا/iu, "troubleshooting error خطا مشکل راهکار"],
+  [/\bsetup\b|راه\s*اندازی|نصب/iu, "setup quick-start quick-setup راه اندازی نصب"],
   [/\bplan\b|پلن|قیمت/iu, "plan pricing price پلن قیمت"],
   [/database|postgres(?:ql)?|mysql|mongodb|redis|دیتابیس|پایگاه\s+داده/iu, "database دیتابیس پایگاه داده postgres postgresql mysql mongodb redis"],
   [/error|خطا|ارور|exception|مشکل/iu, "error خطا ارور exception مشکل"],
@@ -52,7 +67,9 @@ const QUERY_SYNONYMS = [
 
 function tokenVariants(token) {
   const match = QUERY_SYNONYMS.find(([pattern, value]) => pattern.test(token));
-  return match ? tokens(match[1]) : [token];
+  const variants = match ? tokens(match[1]) : [token];
+  const stem = token.replace(/(?:مان|تان|شان|ها|ش|م|ت)$/u, "");
+  return stem.length >= 3 && stem !== token ? [...new Set([...variants, stem])] : variants;
 }
 
 function queryTokens(value) {
@@ -62,6 +79,10 @@ function queryTokens(value) {
 function matchesToken(token, values) {
   const valueSet = values instanceof Set ? values : new Set(values);
   return tokenVariants(token).some((variant) => valueSet.has(variant));
+}
+
+export function matchesDocumentationToken(token, values) {
+  return matchesToken(token, values);
 }
 
 async function findFiles(directory) {
@@ -230,18 +251,18 @@ function scoreDocument(document, query, queryTokens) {
   if (normalizedQuery.length > 5 && document.body.toLocaleLowerCase("fa").includes(normalizedQuery)) score += 2;
   score += titleMatches * 2.2 + sectionMatches * 1.6 + pathMatches;
   score += metadataMatches * 2.4;
+  if (document.category === "references" && document.documentType === "about") score += 4;
   score += documentationDomainBoost(document.path, query);
-  score += technicalPathBoost(document, query);
-  score += Number(document.dbScore || 0);
+  score += Number(document.dbScore || 0) * 0.35;
   return { document, score, coverage: matchingTokens.length, structuralMatches };
 }
 
 function rankDocuments(documents, query) {
   const queryTokens = queryTokensForSearch(query);
-  const minimumCoverage = queryTokens.length <= 2
+  const minimumCoverage = queryTokens.length === 1
     ? 1
     : queryTokens.length <= 5
-      ? Math.ceil(queryTokens.length * 0.5)
+      ? Math.ceil(queryTokens.length * 0.67)
       : Math.max(2, Math.ceil(queryTokens.length * 0.35));
   const ranked = documents
     .map((document) => scoreDocument(searchableDocument(document), query, queryTokens))
@@ -284,25 +305,6 @@ function documentationDomainBoost(relativePath, query) {
 }
 
 const TECHNICAL_TERM_PATTERN = /^(?:api|api-key|cli|docker|redis|postgres|postgresql|mysql|mongodb|ssh|http|https|graphql|deploy|deployment|node|node\.js|python|php|token|cors|dns|ssl|tls)$/iu;
-const TECHNICAL_PATH_BOOSTS = [
-  { pattern: /\bapi\b|کلید\s+(?:دسترسی|api)/iu, paths: ["/references/api/"], boost: 9 },
-  { pattern: /\bcli\b|خط\s*فرمان/iu, paths: ["/references/cli/"], boost: 7 },
-  { pattern: /\bdocker\b|داکر/iu, paths: ["/paas/docker/", "/docker/"], boost: 6 },
-  { pattern: /\bredis\b|ردیس/iu, paths: ["/redis/"], boost: 6 },
-  { pattern: /postgres(?:ql)?|پستگرس/iu, paths: ["/postgresql/"], boost: 6 },
-  { pattern: /\bssh\b/iu, paths: ["/iaas/", "/ssh/"], boost: 4 },
-  { pattern: /deploy|deployment|استقرار|دیپلوی/iu, paths: ["/deploy/", "/getting-started/", "/paas/"], boost: 2 },
-];
-
-function technicalPathBoost(document, query) {
-  const normalizedPath = String(document.path || "").replaceAll("\\", "/").toLowerCase();
-  let boost = 0;
-  for (const entry of TECHNICAL_PATH_BOOSTS) {
-    if (entry.pattern.test(query) && entry.paths.some((segment) => normalizedPath.includes(segment))) boost += entry.boost;
-  }
-  if (/\bapi\b/iu.test(query) && normalizedPath.includes("/api/")) boost += 3;
-  return boost;
-}
 
 function queryTokensForSearch(value) {
   const salient = queryTokens(value);
@@ -342,28 +344,59 @@ async function searchDocumentationDatabase(query) {
   const tsQuery = [...new Set(tokens(expandedQuery).map((term) => term.replace(/[^\p{L}\p{N}_]/gu, "")))].filter(Boolean).join(" | ");
   if (!tsQuery) return [];
   const rows = await prisma.$queryRaw`
-    SELECT
-      c."id",
-      c."section",
-      c."content" AS "body",
-      d."title",
-      d."sourcePath" AS "path",
-      d."url",
-      d."imageUrl",
-      d."category",
-      d."service",
-      d."documentType",
-      ts_rank(
-        to_tsvector('simple', c."normalizedText"),
-        to_tsquery('simple', ${tsQuery})
-      ) AS "dbScore"
-    FROM "KnowledgeChunk" c
-    INNER JOIN "KnowledgeDocument" d ON d."id" = c."documentId"
-    WHERE c."isActive" = true
-      AND d."isActive" = true
-      AND to_tsvector('simple', c."normalizedText") @@ to_tsquery('simple', ${tsQuery})
-    ORDER BY "dbScore" DESC
-    LIMIT ${MAX_RESULTS * 12}
+    WITH matched_chunks AS (
+      SELECT
+        c."id",
+        c."section",
+        c."content" AS "body",
+        c."chunkIndex",
+        d."id" AS "documentId",
+        d."title",
+        d."sourcePath" AS "path",
+        d."url",
+        d."imageUrl",
+        d."category",
+        d."service",
+        d."documentType",
+        ts_rank(
+          setweight(to_tsvector('simple', d."title"), 'A')
+          || setweight(to_tsvector('simple', c."section"), 'A')
+          || setweight(to_tsvector('simple', d."sourcePath"), 'B')
+          || setweight(to_tsvector('simple', c."content"), 'C'),
+          to_tsquery('simple', ${tsQuery})
+        ) AS "dbScore",
+        ROW_NUMBER() OVER (
+          PARTITION BY d."id"
+          ORDER BY ts_rank(
+            setweight(to_tsvector('simple', d."title"), 'A')
+            || setweight(to_tsvector('simple', c."section"), 'A')
+            || setweight(to_tsvector('simple', d."sourcePath"), 'B')
+            || setweight(to_tsvector('simple', c."content"), 'C'),
+            to_tsquery('simple', ${tsQuery})
+          ) DESC, c."chunkIndex" ASC
+        ) AS "documentRank",
+        ROW_NUMBER() OVER (
+          PARTITION BY d."category", d."service"
+          ORDER BY ts_rank(
+            setweight(to_tsvector('simple', d."title"), 'A')
+            || setweight(to_tsvector('simple', c."section"), 'A')
+            || setweight(to_tsvector('simple', d."sourcePath"), 'B')
+            || setweight(to_tsvector('simple', c."content"), 'C'),
+            to_tsquery('simple', ${tsQuery})
+          ) DESC, d."sourcePath" ASC, c."chunkIndex" ASC
+        ) AS "serviceRank"
+      FROM "KnowledgeChunk" c
+      INNER JOIN "KnowledgeDocument" d ON d."id" = c."documentId"
+      WHERE c."isActive" = true
+        AND d."isActive" = true
+        AND to_tsvector('simple', c."normalizedText") @@ to_tsquery('simple', ${tsQuery})
+    )
+    SELECT *
+    FROM matched_chunks
+    WHERE "documentRank" <= 2
+      AND "serviceRank" <= 8
+    ORDER BY "dbScore" DESC, "path" ASC
+    LIMIT ${MAX_RESULTS * 20}
   `;
   return rows.map((row) => ({ ...row, dbScore: Number(row.dbScore || 0) }));
 }

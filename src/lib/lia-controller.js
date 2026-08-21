@@ -1,4 +1,4 @@
-import { searchDocumentation, searchDocumentationOnline } from "@/lib/docs-search";
+import { matchesDocumentationToken, searchDocumentation, searchDocumentationOnline } from "@/lib/docs-search";
 import { isStrongKnowledgeEvidence, searchKnowledge } from "@/lib/lia-brain";
 import { searchWeb } from "@/lib/web-search";
 
@@ -70,7 +70,7 @@ export function latestUserText(messages) {
 
 function hitCoverage(hit, queryTokens) {
   const haystack = new Set(tokens(`${hit.title || ""} ${hit.section || ""} ${hit.path || ""} ${hit.body || ""}`));
-  return queryTokens.filter((token) => haystack.has(token)).length;
+  return queryTokens.filter((token) => matchesDocumentationToken(token, haystack)).length;
 }
 
 function scoreHit(hit, queryTokens) {
@@ -137,7 +137,7 @@ function hasImageAttachment(messages) {
 const IN_SCOPE_PATTERN = /(?:هوش مصنوعی|یادگیری ماشین|یادگیری ماشینی|مدل زبان|چت‌?بات|الگوریتم|پرامپت|توکن|پردازش متن|تکنولوژی|فناوری|کامپیوتر|رایانه|برنامه‌نویسی|برنامه نویسی|کدنویسی|کد|پایتون|جاوااسکریپت|تایپ‌?اسکریپت|جاوا|php|node(?:\.js)?|react|next(?:\.js)?|vue|sql|api|sdk|http|سرور|کلود|ابری|دیتابیس|پایگاه داده|داده|شبکه|امنیت|رمزنگاری|لینوکس|ویندوز|گیت|docker|کانتینر|استقرار|دیپلوی|deploy|دامنه|dns|وب‌?سایت|سایت|اپلیکیشن|نرم‌افزار|نرم افزار|لینک|فایل|خطا|ارور|لاگ|پایگاه دانش|مستندات|documentation|لیارا|liara|پنل|حساب کاربری|سرویس|صورتحساب|فاکتور|ذخیره‌?سازی|پشتیبان|بکاپ|redis|mysql|mongodb|postgres|آی‌?پی|پورت|ssl|tls|ssh|cors|cdn|github|gitlab|اسکرین‌?شات|screenshot)/iu;
 const TECHNICAL_SYMPTOM_PATTERN = /(?:برنامه\s*(?:م|ام|من)|اپلیکیشن\s*(?:م|ام|من)|سایت\s*(?:م|ام|من)|کار نمی\s*(?:کند|کنه)|درست نیست|خراب شده|مشکل دارم|خطا دارم|ارور دارم|صفحه\s+(?:سفید|سیاه)|اسکرین\s*شات)/iu;
 const TECHNICAL_ENTITY_PATTERN = /(?:api|api\s*key|cli|sdk|http|graphql|docker|redis|mysql|mongodb|postgres(?:ql)?|ssh|node(?:\.js)?|python|php|react|next(?:\.js)?|dns|ssl|tls|cors|cdn|github|gitlab|دیتابیس|پایگاه داده|استقرار|دیپلوی|deploy|دامنه|سرور|لیارا|liara)/iu;
-const QUERY_NOISE_WORDS = new Set(["چطور", "چطوری", "چگونه", "نحوه", "میخوام", "می", "خوام", "بگیرم", "گرفتن", "دریافت", "استفاده", "کنم", "کنیم", "میشه", "شود", "کنه"]);
+const QUERY_NOISE_WORDS = new Set(["چطور", "چطوری", "چگونه", "نحوه", "میخوام", "می", "خوام", "بگیرم", "گرفتن", "دریافت", "استفاده", "کنم", "کنیم", "میشه", "شود", "کنه", "کند", "چیست", "چیه", "یعنی", "مستندات", "راهنما", "کجا", "کار", "را", "رو", "بیارم", "بسازم", "بساز", "ساختن"]);
 const QUERY_ACTION_PATTERN = /(?:چطور|چطوری|چگونه|نحوه|میخوام|می\s+خوام|بگیرم|گرفتن|دریافت|استفاده|ساخت|ایجاد|مستندات|راهنما|چیست|معرفی)/iu;
 const QUERY_CONTEXT_REFERENCE_PATTERN = /(?:این|همین|آن|اون|همان|ادامه|قبلی|بالا|این مورد|همین مورد|چطورش|پس)/iu;
 
