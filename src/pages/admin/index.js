@@ -6,6 +6,8 @@ export default function AdminPage({ session }) {
 }
 
 export async function getServerSideProps({ req, res }) {
+  res.setHeader("Cache-Control", "no-store, no-cache, must-revalidate");
+  res.setHeader("Pragma", "no-cache");
   try {
     const session = await getSession(req);
     if (!session) {

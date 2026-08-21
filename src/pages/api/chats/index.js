@@ -8,6 +8,7 @@ function cleanMessage(message) {
     id: String(message?.id || randomUUID()),
     role: String(message?.role || "user"),
     parts: Array.isArray(message?.parts) ? message.parts : [],
+    ...(Number.isFinite(Number(message?.createdAt)) ? { createdAt: Number(message.createdAt) } : {}),
     ...(message?.metadata && typeof message.metadata === "object" ? { metadata: message.metadata } : {}),
   };
 }
@@ -24,7 +25,7 @@ function cleanChat(chat) {
 }
 
 function ownerWhere(owner) {
-  return owner.isAdmin ? {} : owner.userId ? { userId: owner.userId } : { ownerTokenHash: owner.ownerTokenHash };
+  return owner.userId ? { userId: owner.userId } : { ownerTokenHash: owner.ownerTokenHash };
 }
 
 function responseChat(chat) {
@@ -34,7 +35,7 @@ function responseChat(chat) {
     titleGenerated: chat.titleGenerated,
     createdAt: chat.createdAt.getTime(),
     updatedAt: chat.updatedAt.getTime(),
-    messages: chat.messages.map((message) => ({ id: message.id, role: message.role, parts: message.parts, ...(message.metadata ? { metadata: message.metadata } : {}) })),
+    messages: chat.messages.map((message) => ({ id: message.id, role: message.role, parts: message.parts, createdAt: message.createdAt.getTime(), ...(message.metadata ? { metadata: message.metadata } : {}) })),
   };
 }
 
@@ -58,7 +59,6 @@ export default async function handler(req, res) {
     }
 
     const chat = cleanChat(req.body?.chat);
-    const existing = await prisma.chat.findFirst({ where: { id: chat.id, ...ownerWhere(owner) } });
     const data = {
       title: chat.title,
       titleGenerated: chat.titleGenerated,
@@ -66,22 +66,37 @@ export default async function handler(req, res) {
       createdAt: new Date(chat.createdAt),
       updatedAt: new Date(chat.updatedAt),
     };
-    const saved = existing
-      ? await prisma.chat.update({ where: { id: existing.id }, data })
-      : await prisma.chat.create({ data: { id: chat.id, ...data } });
-    await prisma.message.deleteMany({ where: { chatId: saved.id } });
-    if (chat.messages.length) {
-      const createdAt = Date.now();
-      await prisma.message.createMany({
-        data: chat.messages.map((message, index) => ({
-          ...message,
-          chatId: saved.id,
-          createdAt: new Date(createdAt + index),
-        })),
-      });
-    }
-    publishRealtime("chat.updated", { chatId: saved.id, owner: owner.userId ? "user" : "guest", messageCount: chat.messages.length });
-    return res.status(200).json({ ok: true });
+    const saved = await prisma.$transaction(async (transaction) => {
+      const existing = await transaction.chat.findFirst({ where: { id: chat.id, ...ownerWhere(owner) } });
+      if (existing) {
+        const claimed = await transaction.chat.updateMany({
+          where: { id: existing.id, ...ownerWhere(owner), updatedAt: { lte: data.updatedAt } },
+          data,
+        });
+        if (!claimed.count) return null;
+      } else {
+        await transaction.chat.create({ data: { id: chat.id, ...data } });
+      }
+
+      await transaction.message.deleteMany({ where: { chatId: chat.id } });
+      if (chat.messages.length) {
+        const fallbackCreatedAt = Date.now();
+        await transaction.message.createMany({
+          data: chat.messages.map((message, index) => ({
+            id: message.id,
+            role: message.role,
+            parts: message.parts,
+            ...(message.metadata ? { metadata: message.metadata } : {}),
+            chatId: chat.id,
+            createdAt: new Date(message.createdAt || fallbackCreatedAt + index),
+          })),
+        });
+      }
+      return { id: chat.id };
+    });
+
+    if (saved) publishRealtime("chat.updated", { chatId: saved.id, owner: owner.userId ? "user" : "guest", messageCount: chat.messages.length });
+    return res.status(200).json({ ok: true, persisted: Boolean(saved) });
   } catch (error) {
     console.error("Chat persistence failed", error);
     return res.status(503).json({ message: "ذخیره‌سازی گفتگو در دسترس نیست." });

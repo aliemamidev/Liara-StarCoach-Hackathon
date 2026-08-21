@@ -189,12 +189,9 @@ export async function createLiaControllerPlan(messages) {
     return { mode: LIA_STAGES.OUT_OF_SCOPE, stage: LIA_STAGES.OUT_OF_SCOPE, query, hits: [] };
   }
 
-  if (isGeneralTechnicalQuery(query)) {
-    return { mode: LIA_STAGES.PROBABLE, stage: LIA_STAGES.PROBABLE, query, hits: [] };
-  }
-
+  const generalTechnical = isGeneralTechnicalQuery(query);
   const hasImage = hasImageAttachment(messages);
-  if (!understandingComplete(query, conversation)) {
+  if (!understandingComplete(query, conversation) && !generalTechnical) {
     const visualRequired = needsVisualDiagnosis(`${conversation} ${query}`) && !hasImage;
     if (visualRequired && priorStage !== LIA_STAGES.SCREENSHOT) {
       return {
@@ -256,6 +253,10 @@ export async function createLiaControllerPlan(messages) {
   documentationAvailable = documentationAvailable || web.available;
   if (isStrongEvidence(hits, query)) {
     return { mode: LIA_STAGES.ANSWER, stage: LIA_STAGES.ANSWER, query, hits, brainHits, searchTrace };
+  }
+
+  if (generalTechnical) {
+    return { mode: LIA_STAGES.PROBABLE, stage: LIA_STAGES.PROBABLE, query, hits, brainHits, searchTrace, documentationAvailable };
   }
 
   return {

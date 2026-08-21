@@ -2,8 +2,9 @@ import fs from "node:fs/promises";
 import path from "node:path";
 import MeiliSearch from "meilisearch";
 
-const MAX_RESULTS = 5;
-const MAX_BODY_LENGTH = 6500;
+const MAX_RESULTS = 8;
+const MAX_BODY_LENGTH = 4200;
+const CHUNK_LENGTH = 2200;
 const DOCUMENTATION_ROOTS = ["public/llms", "src/pages"];
 const ONLINE_INDEX = "docs";
 const DATABASE_QUERY_PATTERN = /(?:دیتابیس|پایگاه\s+داده|database|postgres(?:ql)?|mysql|mariadb|mongodb|mongo|redis|rabbitmq|elasticsearch|elastic\s*search|mssql|sql\s*server|sqlite|بکاپ|backup|بازیابی|restore|connection\s*pool|اتصال\s+به\s+(?:دیتابیس|پایگاه))/iu;
@@ -11,7 +12,12 @@ let documentsPromise;
 let onlineClient;
 
 function normalizeText(value) {
-  return String(value || "").replace(/[يى]/g, "ی").replace(/ك/g, "ک").replace(/\u200c/g, " ").replace(/\s+/g, " ").trim();
+  return String(value || "")
+    .replace(/[يى]/g, "ی")
+    .replace(/ك/g, "ک")
+    .replace(/\u200c/g, " ")
+    .replace(/\s+/g, " ")
+    .trim();
 }
 
 function tokens(value) {
@@ -29,8 +35,16 @@ async function findFiles(directory) {
   return files;
 }
 
-function markdownToText(content) {
-  return content.replace(/^import\s.+$/gm, "").replace(/^export\s.+$/gm, "").replace(/<[^>]+>/g, " ").replace(/!\[([^\]]*)\]\([^)]*\)/g, "$1").replace(/\[([^\]]+)\]\([^)]*\)/g, "$1").replace(/[`*_>#-]/g, " ");
+function cleanMarkdown(content) {
+  return String(content || "")
+    .replace(/^import\s.+$/gm, "")
+    .replace(/^export\s.+$/gm, "")
+    .replace(/<[^>]+>/g, " ")
+    .replace(/!\[([^\]]*)\]\([^)]*\)/g, "$1")
+    .replace(/\[([^\]]+)\]\([^)]*\)/g, "$1")
+    .replace(/[\r\n]+/g, "\n")
+    .replace(/[ \t]+/g, " ")
+    .trim();
 }
 
 function titleFrom(content, filePath) {
@@ -45,37 +59,79 @@ function docsUrl(content, relativePath) {
   return `https://docs.liara.ir/${route.replace(/\/about$/, "")}/`;
 }
 
+function splitIntoChunks(content, fallbackTitle) {
+  const lines = cleanMarkdown(content).split("\n");
+  const chunks = [];
+  let section = fallbackTitle;
+  let buffer = [];
+
+  const flush = () => {
+    const text = normalizeText(buffer.join(" "));
+    if (!text) return;
+    for (let offset = 0; offset < text.length; offset += CHUNK_LENGTH) {
+      const body = text.slice(offset, offset + CHUNK_LENGTH).trim();
+      if (body) chunks.push({ section, body });
+    }
+    buffer = [];
+  };
+
+  for (const line of lines) {
+    const heading = line.match(/^#{1,4}\s+(.+)$/)?.[1];
+    if (heading) {
+      flush();
+      section = normalizeText(heading.replace(/[*_`]/g, "")) || fallbackTitle;
+    } else {
+      buffer.push(line);
+    }
+  }
+  flush();
+  return chunks.length ? chunks : [{ section: fallbackTitle, body: normalizeText(cleanMarkdown(content)) }];
+}
+
 async function loadDocuments() {
   const allFiles = [];
   for (const root of DOCUMENTATION_ROOTS) {
     try { allFiles.push(...await findFiles(path.join(process.cwd(), root))); } catch { /* optional source root */ }
   }
+
   const documents = [];
   const seen = new Set();
   for (const filePath of allFiles) {
     const raw = await fs.readFile(filePath, "utf8");
     const relativePath = path.relative(process.cwd(), filePath).replaceAll(path.sep, "/");
-    const body = normalizeText(markdownToText(raw));
-    if (!body) continue;
     const title = titleFrom(raw, filePath);
     const url = docsUrl(raw, relativePath);
-    const dedupeKey = `${url}|${body}`;
-    if (seen.has(dedupeKey)) continue;
-    seen.add(dedupeKey);
-    documents.push({ title, path: relativePath, url, body, titleTokens: tokens(title), bodyTokens: new Set(tokens(body)) });
+    for (const chunk of splitIntoChunks(raw, title)) {
+      const body = chunk.body.slice(0, MAX_BODY_LENGTH);
+      if (!body) continue;
+      const dedupeKey = `${url}|${chunk.section}|${body}`;
+      if (seen.has(dedupeKey)) continue;
+      seen.add(dedupeKey);
+      documents.push({
+        title,
+        path: relativePath,
+        url,
+        section: chunk.section,
+        body,
+        titleTokens: tokens(title),
+        sectionTokens: tokens(chunk.section),
+        bodyTokens: new Set(tokens(body)),
+      });
+    }
   }
   return documents;
 }
 
 function scoreDocument(document, query, queryTokens) {
   const normalizedQuery = normalizeText(query).toLocaleLowerCase("fa");
-  const title = normalizeText(document.title).toLocaleLowerCase("fa");
-  const body = document.body.toLocaleLowerCase("fa");
   const matchingTokens = queryTokens.filter((token) => document.bodyTokens.has(token));
+  const titleMatches = queryTokens.filter((token) => document.titleTokens.includes(token)).length;
+  const sectionMatches = queryTokens.filter((token) => document.sectionTokens.includes(token)).length;
   let score = matchingTokens.length / Math.max(queryTokens.length, 1);
-  if (title.includes(normalizedQuery)) score += 3;
-  if (body.includes(normalizedQuery)) score += 1.5;
-  score += queryTokens.filter((token) => document.titleTokens.includes(token)).length * 0.35;
+  if (document.title.toLocaleLowerCase("fa").includes(normalizedQuery)) score += 3;
+  if (document.section.toLocaleLowerCase("fa").includes(normalizedQuery)) score += 1.5;
+  if (document.body.toLocaleLowerCase("fa").includes(normalizedQuery)) score += 1.5;
+  score += titleMatches * 0.45 + sectionMatches * 0.3;
   score += documentationDomainBoost(document.path, query);
   return { document, score, coverage: matchingTokens.length };
 }
@@ -103,9 +159,26 @@ export async function searchDocumentation(query) {
     const documents = await documentsPromise;
     const expandedQuery = expandQuery(query);
     const queryTokens = [...new Set(tokens(expandedQuery))];
-    const hits = documents.map((document) => scoreDocument(document, query, queryTokens)).filter(({ coverage, score }) => coverage > 0 || score > 0).sort((a, b) => b.score - a.score).slice(0, MAX_RESULTS).map(({ document, score, coverage }) => ({ title: document.title, path: document.path, url: document.url, section: document.title, body: document.body.slice(0, MAX_BODY_LENGTH), score, coverage }));
-    return { available: true, hits };
-  } catch { return { available: false, hits: [] }; }
+    const ranked = documents
+      .map((document) => scoreDocument(document, query, queryTokens))
+      .filter(({ coverage, score }) => coverage > 0 || score > 0)
+      .sort((a, b) => b.score - a.score);
+    const selected = [];
+    const perPath = new Map();
+    for (const item of ranked) {
+      const count = perPath.get(item.document.path) || 0;
+      if (count >= 2) continue;
+      selected.push(item);
+      perPath.set(item.document.path, count + 1);
+      if (selected.length >= MAX_RESULTS) break;
+    }
+    return {
+      available: true,
+      hits: selected.map(({ document, score, coverage }) => ({ ...document, score, coverage })),
+    };
+  } catch {
+    return { available: false, hits: [] };
+  }
 }
 
 function getOnlineClient() {
@@ -170,7 +243,8 @@ export function toInternalDocumentationUrl(value) {
 
 export function formatDocumentationSources(hits) {
   if (!hits?.length) return "";
-  return `\n\n## منبع پاسخ\n\n📄 منابع مرتبط:\n\n${hits.map((hit) => {
+  const unique = [...new Map(hits.map((hit) => [hit.url || hit.path || hit.title, hit])).values()];
+  return `\n\n## منبع پاسخ\n\n📄 منابع مرتبط:\n\n${unique.map((hit) => {
     const isWeb = hit.sourceType === "WEB";
     return `- عنوان منبع: ${hit.title}\n  - ${isWeb ? `[مشاهدهٔ منبع](${hit.url})` : `مسیر فایل: \`${hit.path}\`\n  - [مشاهده در Documentation لیارا](${toInternalDocumentationUrl(hit.url)})`}`;
   }).join("\n")}`;

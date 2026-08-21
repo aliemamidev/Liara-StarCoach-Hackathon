@@ -28,6 +28,7 @@ function setCookie(res, token, maxAge) {
     `${SESSION_COOKIE}=${encodeURIComponent(token)}`,
     "Path=/",
     `Max-Age=${maxAge}`,
+    ...(maxAge === 0 ? ["Expires=Thu, 01 Jan 1970 00:00:00 GMT"] : []),
     "HttpOnly",
     "SameSite=Lax",
   ];

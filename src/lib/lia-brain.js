@@ -35,7 +35,6 @@ export async function searchKnowledge(query, limit = 5) {
   const entries = await prisma.knowledgeEntry.findMany({
     where: { isActive: true },
     orderBy: { updatedAt: "desc" },
-    take: 250,
   });
   return entries
     .map((entry) => scoreEntry(entry, queryTokens, normalizedQuery))

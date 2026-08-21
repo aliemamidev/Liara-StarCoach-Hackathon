@@ -28,7 +28,7 @@ export function ChatLayout() {
   const [screenshotError, setScreenshotError] = useState("");
   const sound = useUiSound();
   const chatHistory = useChatHistory();
-  const { hydrated, activeChatId, history, renameChat } = chatHistory;
+  const { hydrated, activeChatId, history, offline, renameChat } = chatHistory;
   const activeChat = history.find((chat) => chat.id === activeChatId);
   const loadedChatRef = useRef(null);
   const messagesViewportRef = useRef(null);
@@ -221,6 +221,7 @@ export function ChatLayout() {
 
         onOpenHistory={() => setHistoryOpen(true)}
       />
+      {offline && <div className="chat-persistence-banner" role="status">اتصال ذخیره‌سازی برقرار نیست؛ نمایش فعلی موقت است و پس از بازگشت اتصال همگام می‌شود.</div>}
       <section ref={messagesViewportRef} className="chat-main">
         {messages.length === 0 ? (
           <ChatEmptyState onSuggestion={submitMessage} />

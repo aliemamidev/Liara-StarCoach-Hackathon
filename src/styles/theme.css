@@ -232,6 +232,14 @@ sidebar[class*="bg-[#fbfbfb]"] .badge {
   overflow-x: clip;
 }
 
+.admin-shell aside {
+  overflow: hidden;
+}
+
+.admin-shell aside nav {
+  scrollbar-width: thin;
+}
+
 .admin-shell main,
 .admin-shell main > div,
 .admin-shell .admin-card,
