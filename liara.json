@@ -1,3 +1,7 @@
 {
-  "port": 3001
+  "port": 3001,
+  "next": {
+    "nodeVersion": "22",
+    "mirror": false
+  }
 }

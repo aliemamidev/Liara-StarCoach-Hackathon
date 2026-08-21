@@ -7,7 +7,7 @@
     "generate-llms": "npm --prefix mdx-to-md-converter ci && npm --prefix mdx-to-md-converter run convert",
     "generate-llms:pre-commit": "npm --prefix mdx-to-md-converter run pre-commit && git add public/llms public/all-links-llms.txt",
     "build": "npm run db:generate && npm run sitemap && npm run fetch:models && next build",
-    "start": "node server.js production",
+    "start": "npm run db:migrate:deploy && npm run db:seed && node server.js production",
     "lint": "eslint \"src/components/chat/*.jsx\" \"src/components/admin/*.jsx\" \"src/components/login-form.jsx\" \"src/components/ui/*.jsx\" \"src/hooks/*.js\" \"src/lib/*.js\" \"src/pages/api/*.js\" \"src/pages/docs/*.js\" \"src/pages/index.js\" \"src/pages/admin/index.js\" \"src/pages/_app.js\" \"src/pages/_document.js\"",
     "sitemap": "node sitemap/generate.js",
     "fetch:models": "node src/scripts/fetch-liara-ai-models.js",
@@ -15,6 +15,7 @@
     "prepare": "npx husky install || echo husky skipped",
     "db:generate": "prisma generate",
     "db:migrate": "prisma migrate dev",
+    "db:migrate:deploy": "prisma migrate deploy",
     "db:seed": "prisma db seed",
     "test:auth": "node scripts/test-auth.mjs"
   },
@@ -49,6 +50,7 @@
     "next": "14.2.3",
     "next-themes": "^0.4.6",
     "pg": "^8.23.0",
+    "prisma": "^7.9.1",
     "react": "^18",
     "react-dom": "^18",
     "react-highlight": "^0.15.0",
@@ -66,11 +68,9 @@
     "eslint": "^8.57.1",
     "eslint-config-next": "^14.2.3",
     "postcss": "^8",
-    "prisma": "^7.9.1",
     "tailwindcss": "^3.4.1"
   },
   "prisma": {
     "seed": "node prisma/seed.js"
-  },
-  "packageManager": "yarn@1.22.22+sha512.a6b2f7906b721bba3d67d4aff083df04dad64c399707841b7acf00f6b133b7ac24255f2652fa22ae3534329dc6180534e98d17432037ff6fd140556e2bb3137e"
+  }
 }
