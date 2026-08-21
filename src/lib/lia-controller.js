@@ -1,9 +1,14 @@
 import { searchDocumentation, searchDocumentationOnline } from "@/lib/docs-search";
+import { isStrongKnowledgeEvidence, searchKnowledge } from "@/lib/lia-brain";
+import { searchWeb } from "@/lib/web-search";
 
 export const LIA_STAGES = Object.freeze({
   ANSWER: "answer",
-  CLARIFICATION: "clarification",
-  SCREENSHOT: "screenshot",
+  CLARIFICATION: "clarifying",
+  SCREENSHOT: "awaiting_screenshot",
+  RETRIEVING: "retrieving",
+  ESCALATED: "escalated",
+  ADMIN_ANSWERED: "admin_answered",
   PROBABLE: "probable",
   OUT_OF_SCOPE: "out_of_scope",
 });
@@ -12,20 +17,13 @@ const QUERY_TOKEN_PATTERN = /[\p{L}\p{N}]+/gu;
 
 export const CLARIFICATION_MESSAGE = `## پرسش تکمیلی
 
-برای تشخیص دقیق‌تر، لطفاً کوتاه بگویید:
+برای اینکه راهکار درست را پیدا کنم، چند جزئیات کوتاه لازم دارم.`;
 
-1. مشکل در کدام صفحه، بخش یا محیط رخ می‌دهد؟
-2. متن دقیق خطا یا پیام نمایش‌داده‌شده چیست؟
-3. انتظار داشتید چه اتفاقی بیفتد و در عمل چه اتفاقی افتاد؟`;
+export const SCREENSHOT_MESSAGE = `## بررسی تصویری لازم است
 
-export const SCREENSHOT_MESSAGE = `## درخواست Screenshot
+برای تشخیص این مشکل، متن خطا یا وضعیت صفحه در یک Screenshot کمک زیادی می‌کند. قبل از ارسال، رمز عبور، Token، API Key و اطلاعات شخصی را بپوشانید.
 
-برای اینکه بتوانم مشکل را دقیق‌تر بررسی کنم، لطفاً یک Screenshot ارسال کنید. بهتر است تصویر شامل صفحه‌ای باشد که مشکل در آن رخ می‌دهد، متن کامل خطا یا پیام، و بخش تنظیمات یا پنلی باشد که به مشکل مربوط است. اگر مشکل چند مرحله دارد، از مراحل مهم هم تصویر بفرستید.
-
-1. از صفحهٔ مرتبط Screenshot بگیرید.
-2. در همین چت، از منوی «افزودن» گزینهٔ «Screenshot» را انتخاب کنید؛ یا تصویر را با گزینهٔ «افزودن فایل» پیوست کنید.
-
-قبل از ارسال، رمز عبور، کلید API، توکن، اطلاعات شخصی یا هر دادهٔ محرمانه را مخفی کنید. اگر امکان ارسال تصویر ندارید، متن کامل خطا، مراحل انجام کار و سیستم‌عامل/مرورگر/ابزار و نسخهٔ آن را بنویسید.`;
+اگر امکان ارسال تصویر ندارید، متن کامل خطا، مراحل انجام کار و محیط اجرا را بنویسید.`;
 
 export const DOCUMENTATION_UNAVAILABLE_MESSAGE = `## پاسخ
 
@@ -105,6 +103,10 @@ function previousStage(messages) {
   return assistant?.metadata?.liaStage;
 }
 
+function allUserText(messages) {
+  return messages.filter((message) => message.role === "user").map((message) => latestUserText([message])).filter(Boolean).join(" ");
+}
+
 function hasImageAttachment(messages) {
   const latestUserMessage = [...messages].reverse().find((message) => message.role === "user");
   return (latestUserMessage?.parts || []).some((part) => part?.type === "file" && String(part.mediaType || "").startsWith("image/"));
@@ -115,8 +117,6 @@ const TECHNICAL_SYMPTOM_PATTERN = /(?:برنامه\s*(?:م|ام|من)|اپلیک
 
 const GENERAL_TECHNICAL_EXPLANATION_PATTERN = /(?:چیست|چیستند|یعنی چه|چه تفاوتی|تفاوت|تعریف|معنی|چگونه کار می\s*کند|چطور کار می\s*کند|چطور(?:\s+\S+){0,8}\s*(?:ایجاد|بساز|ساخت)\s*(?:کنم|کنیم)?|چگونه(?:\s+\S+){0,8}\s*(?:ایجاد|بساز|ساخت)\s*(?:کنم|کنیم)?|توضیح بده|معرفی کن|what is|what are|difference between|how does .* work)/iu;
 const LIARA_SPECIFIC_PATTERN = /(?:لیارا|liara|پنل|قیمت|پلن|صورتحساب|فاکتور|سرویس لیارا|مستندات لیارا|حساب کاربری|دامنه\s*من|دامنه\s*ام|اپلیکیشن\s*من|برنامه\s*ام|در لیارا|روی لیارا)/iu;
-const DATABASE_QUERY_PATTERN = /(?:دیتابیس|پایگاه\s+داده|database|postgres(?:ql)?|mysql|mariadb|mongodb|mongo|redis|rabbitmq|elasticsearch|elastic\s*search|mssql|sql\s*server|sqlite)/iu;
-
 export function isLikelyInScope(query) {
   const normalizedQuery = normalizeText(query);
   return IN_SCOPE_PATTERN.test(normalizedQuery) || TECHNICAL_SYMPTOM_PATTERN.test(normalizedQuery);
@@ -127,12 +127,6 @@ function isGeneralTechnicalQuery(query) {
   return isLikelyInScope(normalizedQuery)
     && GENERAL_TECHNICAL_EXPLANATION_PATTERN.test(normalizedQuery)
     && !LIARA_SPECIFIC_PATTERN.test(normalizedQuery);
-}
-
-function hasInsufficientDescription(query) {
-  const queryTokens = [...new Set(tokens(query))];
-  if (DATABASE_QUERY_PATTERN.test(normalizeText(query)) && queryTokens.length >= 2) return false;
-  return queryTokens.length < 3 || /^(کمک|مشکل دارم|کار نمی‌کند|کار نمیکند|خطا|ارور|درست نیست|نمی‌شود|نمیشه|help|error)$/i.test(normalizeText(query));
 }
 
 const VISUAL_DIAGNOSTIC_PATTERN = /(?:خطا|ارور|کار نمی\s*(?:کند|کنه)|درست اجرا نمی\s*شود|باگ|رفتار غیرمنتظره|نمایش داده نمی\s*شود|ظاهر خراب|صفحه سفید|صفحه سیاه|پیام خطا|اسکرین‌?شات|screenshot|error|bug|not working|unexpected)/iu;
@@ -148,46 +142,101 @@ function shouldSearchOnline(hits, query) {
   return !isStrongEvidence(hits, query);
 }
 
+function detectedService(query) {
+  return /(?:لیارا|liara|paas|dbaas|iaas|ai|dns|email|mail|object\s*storage|ذخیره‌?سازی|دیتابیس|پایگاه\s+داده|postgres(?:ql)?|mysql|mongodb|redis|node(?:\.js)?|python|php|docker|دامنه|پنل|اپلیکیشن|سرویس)/iu.test(query);
+}
+
+function hasGoal(query) {
+  const normalized = normalizeText(query);
+  return tokens(normalized).length >= 4 && !/^(?:کمک|مشکل دارم|خطا|ارور|help|error)$/iu.test(normalized);
+}
+
+function hasEnvironment(query) {
+  return /(?:نسخه|version|runtime|production|prod|development|dev|محیط|مرورگر|browser|ویندوز|لینوکس|macos|سیستم‌?عامل|سرور|vps|کانتینر|docker)/iu.test(query);
+}
+
+function hasErrorDescription(query) {
+  return /(?:خطا|ارور|error|status\s*\d{3}|\b\d{3}\b|پیام|کار نمی|نمی\s*(?:شود|کند)|صفحه سفید|صفحه سیاه|رفتار)/iu.test(query);
+}
+
+function clarificationQuestions(query) {
+  const questions = [];
+  if (!detectedService(query)) questions.push("مشکل مربوط به کدام سرویس یا بخش لیارا است؟");
+  if (!hasGoal(query)) questions.push("می‌خواهید دقیقاً چه کاری انجام دهید یا به چه نتیجه‌ای برسید؟");
+  if (needsVisualDiagnosis(query) && !hasErrorDescription(query)) questions.push("الان روی صفحه چه چیزی می‌بینید یا چه پیامی نمایش داده می‌شود؟");
+  if (hasErrorDescription(query) && !hasEnvironment(query)) questions.push("این مشکل در چه محیط، نسخه یا مرورگری رخ می‌دهد؟");
+  return questions.slice(0, 4);
+}
+
+function buildClarification(query) {
+  const questions = clarificationQuestions(query);
+  if (!questions.length) return CLARIFICATION_MESSAGE;
+  return `${CLARIFICATION_MESSAGE}\n\n${questions.map((question, index) => `${index + 1}. ${question}`).join("\n")}`;
+}
+
+function understandingComplete(query, conversation) {
+  const combined = normalizeText(`${conversation} ${query}`);
+  const diagnostic = needsVisualDiagnosis(combined) || hasErrorDescription(combined);
+  return detectedService(combined) && hasGoal(combined) && (!diagnostic || (hasErrorDescription(combined) && hasEnvironment(combined)));
+}
+
 export async function createLiaControllerPlan(messages) {
   const query = latestUserText(messages);
   const priorStage = previousStage(messages);
+  const conversation = allUserText(messages);
 
   if (!isLikelyInScope(query)) {
     return { mode: LIA_STAGES.OUT_OF_SCOPE, stage: LIA_STAGES.OUT_OF_SCOPE, query, hits: [] };
-  }
-
-  if (hasImageAttachment(messages)) {
-    return { mode: LIA_STAGES.PROBABLE, stage: LIA_STAGES.PROBABLE, query, hits: [] };
   }
 
   if (isGeneralTechnicalQuery(query)) {
     return { mode: LIA_STAGES.PROBABLE, stage: LIA_STAGES.PROBABLE, query, hits: [] };
   }
 
-  if (hasInsufficientDescription(query) || needsVisualDiagnosis(query)) {
-    const stage = priorStage === LIA_STAGES.CLARIFICATION
-      ? LIA_STAGES.SCREENSHOT
-      : LIA_STAGES.CLARIFICATION;
-    return { mode: stage, stage, query, hits: [] };
+  const hasImage = hasImageAttachment(messages);
+  if (!understandingComplete(query, conversation)) {
+    const visualRequired = needsVisualDiagnosis(`${conversation} ${query}`) && !hasImage;
+    if (visualRequired && priorStage !== LIA_STAGES.SCREENSHOT) {
+      return {
+        mode: LIA_STAGES.SCREENSHOT,
+        stage: LIA_STAGES.SCREENSHOT,
+        query,
+        hits: [],
+        searchTrace: [],
+        metadata: { liaAction: "screenshot", screenshotReason: "برای دیدن خطا یا وضعیت صفحه" },
+        message: SCREENSHOT_MESSAGE,
+      };
+    }
+    return {
+      mode: LIA_STAGES.CLARIFICATION,
+      stage: LIA_STAGES.CLARIFICATION,
+      query,
+      hits: [],
+      searchTrace: [],
+      message: buildClarification(query),
+    };
   }
 
-  const local = await searchDocumentation(query);
+  const searchTrace = ["brain"];
+  let brainHits = [];
+  try {
+    brainHits = await searchKnowledge(query);
+    if (!isStrongKnowledgeEvidence(brainHits, query) && conversation !== query) brainHits = await searchKnowledge(conversation);
+  } catch { brainHits = []; }
+  if (isStrongKnowledgeEvidence(brainHits, query) || isStrongKnowledgeEvidence(brainHits, conversation)) {
+    return { mode: LIA_STAGES.ANSWER, stage: LIA_STAGES.ANSWER, query, hits: [], brainHits, searchTrace };
+  }
+
+  searchTrace.push("local_docs");
+  const local = await searchDocumentation(`${conversation} ${query}`);
   let hits = local.hits;
   let documentationAvailable = local.available;
 
+  searchTrace.push("meilisearch_docs");
   if (shouldSearchOnline(hits, query)) {
     const online = await searchDocumentationOnline(query);
     documentationAvailable = documentationAvailable || online.available;
     hits = mergeHits(hits, online.hits);
-  }
-
-  if (!documentationAvailable) {
-    return {
-      mode: "unavailable",
-      stage: LIA_STAGES.CLARIFICATION,
-      query,
-      hits: [],
-    };
   }
 
   if (isStrongEvidence(hits, query)) {
@@ -196,14 +245,29 @@ export async function createLiaControllerPlan(messages) {
       stage: LIA_STAGES.ANSWER,
       query,
       hits,
+      brainHits,
+      searchTrace,
     };
   }
 
-  const stage = priorStage === LIA_STAGES.CLARIFICATION
-    ? LIA_STAGES.SCREENSHOT
-    : LIA_STAGES.CLARIFICATION;
+  searchTrace.push("web");
+  const web = await searchWeb(`${conversation} ${query}`);
+  if (web.available) hits = mergeHits(hits, web.hits);
+  documentationAvailable = documentationAvailable || web.available;
+  if (isStrongEvidence(hits, query)) {
+    return { mode: LIA_STAGES.ANSWER, stage: LIA_STAGES.ANSWER, query, hits, brainHits, searchTrace };
+  }
 
-  return { mode: stage, stage, query, hits: [] };
+  return {
+    mode: LIA_STAGES.ESCALATED,
+    stage: LIA_STAGES.ESCALATED,
+    query,
+    clarifiedQuestion: `${conversation} ${query}`.trim().slice(0, 5000),
+    hits,
+    brainHits,
+    searchTrace,
+    documentationAvailable,
+  };
 }
 
 const INTERNAL_OUTPUT_PATTERN = /system prompt|developer message|internal reasoning|زنجیرهٔ فکر|تحلیل داخلی|پرامپت\s*سیستم|قوانین\s*داخلی|دستورهای\s*داخلی/i;

@@ -2,6 +2,8 @@ export const adminNavItems = [
   { id: "dashboard", label: "داشبورد", caption: "نمای کلی سیستم", icon: "LayoutDashboard" },
   { id: "messages", label: "پیام‌ها", caption: "مرور تعاملات", icon: "MessagesSquare" },
   { id: "unanswered", label: "پرسش‌های بی‌پاسخ", caption: "نیازمند بررسی", icon: "CircleHelp" },
+  { id: "escalations", label: "ارجاع‌های ادمین", caption: "صف بررسی انسانی", icon: "Inbox" },
+  { id: "brain", label: "مغز من", caption: "دانش تأییدشده Lia", icon: "Brain" },
   { id: "analytics", label: "تحلیل‌ها", caption: "الگوهای رفتاری", icon: "ChartNoAxesCombined" },
   { id: "users", label: "کاربران", caption: "اعضای فعال", icon: "Users" },
   { id: "settings", label: "تنظیمات", caption: "کنترل پنل", icon: "Settings2" },
@@ -22,6 +24,16 @@ export const adminPageMeta = {
     eyebrow: "سیگنال‌های محصول",
     title: "پرسش‌های بی‌پاسخ",
     description: "موضوعاتی که دانش فعلی دستیار پوشش نمی‌دهد، این‌جا اولویت‌بندی شده‌اند.",
+  },
+  escalations: {
+    eyebrow: "پشتیبانی انسانی",
+    title: "ارجاع‌های ادمین",
+    description: "پرسش‌هایی را که منابع موجود پوشش نداده‌اند بررسی و پاسخ دهید.",
+  },
+  brain: {
+    eyebrow: "دانش تأییدشده Lia",
+    title: "مغز من",
+    description: "پاسخ‌های تأییدشده را ویرایش کنید تا در پاسخ‌های بعدی قابل استفاده باشند.",
   },
   analytics: {
     eyebrow: "تصمیم‌گیری داده‌محور",

@@ -8,6 +8,7 @@ import {
   ArrowUpLeft,
   Bell,
   Bot,
+  Brain,
   CalendarDays,
   ChartNoAxesCombined,
   Check,
@@ -70,14 +71,18 @@ import {
   weeklyMessages,
   adminNotifications,
 } from "@/data/admin-dashboard";
+import { BrainPage } from "@/components/admin/brain-page";
+import { EscalationsPage } from "@/components/admin/escalations-page";
 
 const iconMap = {
   LayoutDashboard,
   MessagesSquare,
   CircleHelp,
+  Inbox,
   ChartNoAxesCombined,
   Users,
   Settings2,
+  Brain,
 };
 
 const toneClasses = {
@@ -325,6 +330,11 @@ function AdminDashboardShell({ session }) {
   const [lastUpdated, setLastUpdated] = useState("همین حالا");
   const meta = adminPageMeta[activeSection];
 
+  useEffect(() => {
+    const section = String(router.query?.section || "");
+    if (adminPageMeta[section]) setActiveSection(section);
+  }, [router.isReady, router.query?.section]);
+
   const loadOverview = () => fetch("/api/admin/overview").then((response) => response.ok ? response.json() : Promise.reject(new Error("overview unavailable"))).then((data) => {
     setAdminData(data);
     setUnknownItems(data.unanswered || []);
@@ -358,6 +368,7 @@ function AdminDashboardShell({ session }) {
     if (section === activeSection) return;
     setLoading(true);
     setActiveSection(section);
+    router.replace({ pathname: "/admin", query: { section } }, undefined, { shallow: true });
     window.setTimeout(() => setLoading(false), 250);
   };
 
@@ -395,7 +406,7 @@ function AdminDashboardShell({ session }) {
     <div dir="rtl" className="admin-shell min-h-dvh bg-[#f5f7fb] text-[#1a2940] selection:bg-[#bcefe7] selection:text-[#143b3a]">
       <aside className={`fixed inset-y-0 right-0 z-30 hidden bg-[#14233a] transition-[width] duration-200 lg:block ${sidebarCollapsed ? "w-20" : "w-64"}`}><AdminSidebar activeSection={activeSection} onNavigate={navigate} collapsed={sidebarCollapsed} onToggle={() => setSidebarCollapsed((current) => !current)} /></aside>
       <Sheet open={mobileOpen} onOpenChange={setMobileOpen}><SheetContent side="right" className="w-[285px] border-[#2a3b56] bg-[#14233a] p-0 text-white"><AdminSidebar activeSection={activeSection} onNavigate={navigate} mobile /></SheetContent></Sheet>
-      <div className={sidebarCollapsed ? "lg:pr-20" : "lg:pr-64"}><AdminHeader onMenu={() => setMobileOpen(true)} onNavigate={navigate} onProfile={() => router.push("/admin/profile")} onRefresh={refresh} onLogout={logout} user={user} notifications={notifications} onNotificationOpen={openNotification} onNotificationRead={markNotificationRead} /><main className="px-4 py-6 sm:px-7 lg:px-10 lg:py-8"><div className="mx-auto max-w-[1500px]"><div className="mb-7 flex flex-col justify-between gap-5 md:flex-row md:items-end"><div><div className="mb-3 flex items-center gap-2 text-[10px] font-bold tracking-[0.12em] text-[#7e8da1]"><span className="h-1.5 w-1.5 rounded-full bg-[#18a996]" />{meta.eyebrow}</div><h1 className="text-[25px] font-extrabold tracking-tight text-[#1b2b43] sm:text-[30px]">{activeSection === "dashboard" ? `سلام، ${user.name}` : meta.title}</h1><p className="mt-2 max-w-2xl text-xs leading-6 text-[#8390a2]">{meta.description}</p></div><div className="flex items-center gap-2"><span className="hidden text-[10px] font-semibold text-[#9aa6b7] sm:inline">آخرین به‌روزرسانی: {lastUpdated}</span><Button variant="outline" size="sm" className="h-10 border-[#e2e8f0] bg-white text-xs text-[#5f6f84]" onClick={refresh}><RotateCcw size={14} />به‌روزرسانی</Button></div></div>{loading ? <div className="grid gap-5"><Card className="flex min-h-[420px] items-center justify-center"><div className="text-center"><span className="mx-auto flex h-11 w-11 animate-pulse items-center justify-center rounded-2xl bg-[#e9f0fb] text-[#5b7fc1]"><Wifi size={20} /></span><p className="mt-4 text-sm font-bold text-[#54647a]">در حال دریافت داده‌ها...</p><p className="mt-1 text-[11px] text-[#9aa6b7]">این صفحه لحظه‌ای دیگر آماده است.</p></div></Card></div> : activeSection === "dashboard" ? <DashboardPage data={adminData} onSelect={setSelectedMessage} onNavigate={navigate} /> : activeSection === "messages" ? <MessagesPage items={adminData.messages} onSelect={setSelectedMessage} /> : activeSection === "unanswered" ? <UnansweredPage items={unknownItems} onResolve={(id) => setUnknownItems((current) => current.filter((item) => item.id !== id))} onSelect={setSelectedMessage} /> : activeSection === "analytics" ? <AnalyticsPage /> : activeSection === "users" ? <UsersPage items={adminData.users} /> : <SettingsPage />}</div></main></div>
+      <div className={sidebarCollapsed ? "lg:pr-20" : "lg:pr-64"}><AdminHeader onMenu={() => setMobileOpen(true)} onNavigate={navigate} onProfile={() => router.push("/admin/profile")} onRefresh={refresh} onLogout={logout} user={user} notifications={notifications} onNotificationOpen={openNotification} onNotificationRead={markNotificationRead} /><main className="px-4 py-6 sm:px-7 lg:px-10 lg:py-8"><div className="mx-auto max-w-[1500px]"><div className="mb-7 flex flex-col justify-between gap-5 md:flex-row md:items-end"><div><div className="mb-3 flex items-center gap-2 text-[10px] font-bold tracking-[0.12em] text-[#7e8da1]"><span className="h-1.5 w-1.5 rounded-full bg-[#18a996]" />{meta.eyebrow}</div><h1 className="text-[25px] font-extrabold tracking-tight text-[#1b2b43] sm:text-[30px]">{activeSection === "dashboard" ? `سلام، ${user.name}` : meta.title}</h1><p className="mt-2 max-w-2xl text-xs leading-6 text-[#8390a2]">{meta.description}</p></div><div className="flex items-center gap-2"><span className="hidden text-[10px] font-semibold text-[#9aa6b7] sm:inline">آخرین به‌روزرسانی: {lastUpdated}</span><Button variant="outline" size="sm" className="h-10 border-[#e2e8f0] bg-white text-xs text-[#5f6f84]" onClick={refresh}><RotateCcw size={14} />به‌روزرسانی</Button></div></div>{loading ? <div className="grid gap-5"><Card className="flex min-h-[420px] items-center justify-center"><div className="text-center"><span className="mx-auto flex h-11 w-11 animate-pulse items-center justify-center rounded-2xl bg-[#e9f0fb] text-[#5b7fc1]"><Wifi size={20} /></span><p className="mt-4 text-sm font-bold text-[#54647a]">در حال دریافت داده‌ها...</p><p className="mt-1 text-[11px] text-[#9aa6b7]">این صفحه لحظه‌ای دیگر آماده است.</p></div></Card></div> : activeSection === "dashboard" ? <DashboardPage data={adminData} onSelect={setSelectedMessage} onNavigate={navigate} /> : activeSection === "messages" ? <MessagesPage items={adminData.messages} onSelect={setSelectedMessage} /> : activeSection === "unanswered" ? <UnansweredPage items={unknownItems} onResolve={(id) => setUnknownItems((current) => current.filter((item) => item.id !== id))} onSelect={setSelectedMessage} /> : activeSection === "escalations" ? <EscalationsPage /> : activeSection === "brain" ? <BrainPage /> : activeSection === "analytics" ? <AnalyticsPage /> : activeSection === "users" ? <UsersPage items={adminData.users} /> : <SettingsPage />}</div></main></div>
     </div>
     {toastNotification && <Toast notification={toastNotification} onOpen={() => openNotification(toastNotification)} onDismiss={() => setToastNotification(null)} />}
     <ConversationDialog message={selectedMessage} onClose={() => setSelectedMessage(null)} />

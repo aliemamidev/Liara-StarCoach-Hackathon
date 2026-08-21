@@ -81,11 +81,50 @@ export function ChatLayout() {
   function submitMessage(value = input) {
     const trimmed = value.trim();
     if ((!trimmed && !files.length) || status === "submitted" || status === "streaming") return;
+    const chatId = activeChatId || globalThis.crypto?.randomUUID?.() || `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
+    if (!activeChatId) chatHistory.setActiveChatId(chatId);
     liveResponseRef.current = true;
-    sendMessage({ text: trimmed, files });
+    sendMessage({ text: trimmed, files }, { body: { chatId } });
     setInput("");
     setFiles([]);
   }
+
+  useEffect(() => {
+    if (!activeChatId) return undefined;
+    let socket;
+    let disposed = false;
+    const refreshFromServer = async () => {
+      if (disposed || status === "submitted" || status === "streaming") return;
+      try {
+        const response = await fetch("/api/chats");
+        if (!response.ok) return;
+        const result = await response.json();
+        const serverChat = (result.chats || []).find((chat) => chat.id === activeChatId);
+        if (serverChat?.messages?.length > messages.length) setMessages(serverChat.messages);
+      } catch {
+        // The regular chat persistence path remains the source of truth when realtime is unavailable.
+      }
+    };
+    try {
+      socket = new window.WebSocket(`${window.location.protocol === "https:" ? "wss" : "ws"}://${window.location.host}/api/realtime`);
+      socket.addEventListener("message", (event) => {
+        try {
+          const message = JSON.parse(event.data);
+          if (message.type === "chat.updated" && message.payload?.chatId === activeChatId) refreshFromServer();
+        } catch {
+          // Ignore malformed realtime events.
+        }
+      });
+    } catch {
+      socket = null;
+    }
+    const interval = window.setInterval(refreshFromServer, 8000);
+    return () => {
+      disposed = true;
+      socket?.close();
+      window.clearInterval(interval);
+    };
+  }, [activeChatId, messages.length, setMessages, status]);
 
   function retry() {
     clearError();
@@ -189,6 +228,7 @@ export function ChatLayout() {
             playSound={sound.playSound}
             isLive={liveResponseRef.current}
             scrollContainerRef={messagesViewportRef}
+            onScreenshot={() => { setScreenshotError(""); setScreenshotSourceOpen(true); }}
           />
         )}
         {error && (

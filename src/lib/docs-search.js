@@ -169,5 +169,9 @@ export function toInternalDocumentationUrl(value) {
 }
 
 export function formatDocumentationSources(hits) {
-  return `\n\n## منبع پاسخ\n\n📄 Documentation:\n\n${hits.map((hit) => `- عنوان سند: ${hit.title}\n  - مسیر فایل: \`${hit.path}\`\n  - [مشاهده در Documentation لیارا](${toInternalDocumentationUrl(hit.url)})`).join("\n")}`;
+  if (!hits?.length) return "";
+  return `\n\n## منبع پاسخ\n\n📄 منابع مرتبط:\n\n${hits.map((hit) => {
+    const isWeb = hit.sourceType === "WEB";
+    return `- عنوان منبع: ${hit.title}\n  - ${isWeb ? `[مشاهدهٔ منبع](${hit.url})` : `مسیر فایل: \`${hit.path}\`\n  - [مشاهده در Documentation لیارا](${toInternalDocumentationUrl(hit.url)})`}`;
+  }).join("\n")}`;
 }

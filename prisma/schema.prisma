@@ -11,6 +11,18 @@ enum UserRole {
   ADMIN
 }
 
+enum KnowledgeSourceType {
+  ADMIN
+  DOCS
+  WEB
+}
+
+enum EscalationStatus {
+  PENDING
+  ANSWERED
+  CLOSED
+}
+
 model User {
   id           String    @id @default(cuid())
   email        String    @unique
@@ -22,6 +34,8 @@ model User {
   updatedAt    DateTime  @updatedAt
   sessions     Session[]
   chats        Chat[]
+  knowledgeEntries KnowledgeEntry[]
+  answeredEscalations EscalationTicket[] @relation("EscalationAnsweredBy")
 
   @@index([role])
   @@index([isActive])
@@ -37,6 +51,7 @@ model Chat {
   updatedAt      DateTime  @updatedAt
   user           User?     @relation(fields: [userId], references: [id], onDelete: Cascade)
   messages       Message[]
+  escalations    EscalationTicket[]
 
   @@index([userId])
   @@index([ownerTokenHash])
@@ -48,6 +63,7 @@ model Message {
   chatId    String
   role      String
   parts     Json
+  metadata  Json?
   createdAt DateTime @default(now())
   chat      Chat     @relation(fields: [chatId], references: [id], onDelete: Cascade)
 
@@ -64,4 +80,49 @@ model Session {
 
   @@index([userId])
   @@index([expiresAt])
+}
+
+model KnowledgeEntry {
+  id                 String              @id @default(cuid())
+  question           String
+  normalizedQuestion String
+  answer             String
+  sourceType         KnowledgeSourceType @default(ADMIN)
+  sourceRefs         Json                @default("[]")
+  tags               String[]            @default([])
+  isActive           Boolean             @default(true)
+  usageCount         Int                 @default(0)
+  createdById        String?
+  createdAt          DateTime            @default(now())
+  updatedAt          DateTime            @updatedAt
+  createdBy          User?               @relation(fields: [createdById], references: [id], onDelete: SetNull)
+  escalationTickets  EscalationTicket[]
+
+  @@index([normalizedQuestion])
+  @@index([isActive])
+  @@index([sourceType])
+}
+
+model EscalationTicket {
+  id                   String           @id @default(cuid())
+  chatId               String
+  userQuestion         String
+  clarifiedQuestion    String
+  conversationSnapshot Json
+  attachmentsSnapshot  Json
+  searchTrace          Json
+  status               EscalationStatus @default(PENDING)
+  adminAnswer          String?
+  answeredById         String?
+  answeredAt           DateTime?
+  knowledgeEntryId     String?
+  createdAt            DateTime         @default(now())
+  updatedAt            DateTime         @updatedAt
+  chat                 Chat             @relation(fields: [chatId], references: [id], onDelete: Cascade)
+  answeredBy           User?            @relation("EscalationAnsweredBy", fields: [answeredById], references: [id], onDelete: SetNull)
+  knowledgeEntry       KnowledgeEntry? @relation(fields: [knowledgeEntryId], references: [id], onDelete: SetNull)
+
+  @@index([chatId, status])
+  @@index([status, updatedAt])
+  @@index([knowledgeEntryId])
 }

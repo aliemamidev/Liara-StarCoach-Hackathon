@@ -36,7 +36,8 @@ async function generateSitemap() {
       .map(filePath =>
         filePath.replace(/\\/g, "/").split("pages").pop().slice(0, -3)
       )
-      .filter(staticPage => !ignoredPages.includes(staticPage));
+      .filter(staticPage => !ignoredPages.includes(staticPage))
+      .filter(staticPage => !staticPage.startsWith("/admin") && (!staticPage.startsWith("/api") || ["/api/chat", "/api/chat-config"].includes(staticPage)));
 
     content.push("/");
 
@@ -55,7 +56,7 @@ async function generateSitemap() {
         })
         .join("")}
     </urlset>
-  `;
+  \n`;
 
     await fs.writeFile("./public/sitemap.xml", sitemap);
     console.log("Generating sitemap...");

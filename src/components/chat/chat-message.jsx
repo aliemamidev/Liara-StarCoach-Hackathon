@@ -2,6 +2,8 @@ import { ChatActions } from "@/components/chat/chat-actions";
 import { useEffect, useRef, useState } from "react";
 import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
+import { ImagePlus } from "lucide-react";
+import { Button } from "@/components/ui/button";
 
 function messageText(message) {
   return (message.parts || [])
@@ -25,7 +27,7 @@ const markdownComponents = {
   },
 };
 
-export function ChatMessage({ message, onRetry, playSound, isStreaming, isLive }) {
+export function ChatMessage({ message, onRetry, playSound, isStreaming, isLive, onScreenshot }) {
   const content = messageText(message);
   const isUser = message.role === "user";
   const attachments = (message.parts || []).filter((part) => part.type === "file" && part.url);
@@ -86,6 +88,15 @@ export function ChatMessage({ message, onRetry, playSound, isStreaming, isLive }
           )
         ) : (isStreaming ? "" : "پاسخی دریافت نشد.")}
       </div>
+      {!isUser && message.metadata?.liaAction === "screenshot" && onScreenshot && (
+        <div className="mt-3 rounded-2xl border border-[hsl(var(--chat-accent)/.25)] bg-[hsl(var(--chat-accent)/.07)] p-3">
+          <p className="text-xs leading-6 text-[hsl(var(--chat-text))]">{message.metadata.screenshotReason || "عکس از صفحه به تشخیص دقیق کمک می‌کند."}</p>
+          <Button type="button" size="sm" className="mt-3 min-h-11" onClick={onScreenshot}>
+            <ImagePlus size={16} aria-hidden="true" />
+            عکس از صفحه
+          </Button>
+        </div>
+      )}
       {attachments.length > 0 && (
         <div className="chat-message-attachments">
           {attachments.map((attachment, index) => (
@@ -104,7 +115,6 @@ export function ChatMessage({ message, onRetry, playSound, isStreaming, isLive }
 }
 
 export { messageText };
-
 
 
 

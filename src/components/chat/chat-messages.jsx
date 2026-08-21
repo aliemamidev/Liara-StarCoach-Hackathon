@@ -4,7 +4,7 @@ import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
 import { ChatMessage } from "@/components/chat/chat-message";
 
-export function ChatMessages({ messages, status, onRetry, playSound, isLive = false, scrollContainerRef }) {
+export function ChatMessages({ messages, status, onRetry, playSound, isLive = false, scrollContainerRef, onScreenshot }) {
   const previousMessageCountRef = useRef(messages.length);
   const pinnedToBottomRef = useRef(true);
   const liveMessageIdRef = useRef(null);
@@ -62,6 +62,7 @@ export function ChatMessages({ messages, status, onRetry, playSound, isLive = fa
             playSound={playSound}
             isStreaming={isStreaming && index === messages.length - 1 && message.role === "assistant"}
             isLive={liveMessageIdRef.current === message.id}
+            onScreenshot={onScreenshot}
           />
         ))}
         {isStreaming && messages[messages.length - 1]?.role === "user" && (
@@ -95,4 +96,3 @@ export function ChatMessages({ messages, status, onRetry, playSound, isLive = fa
     </div>
   );
 }
-

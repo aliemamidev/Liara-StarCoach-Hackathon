@@ -15,16 +15,22 @@ function serializeMessages(messages) {
   return messages.map((message) => ({
     id: message.id,
     role: message.role,
-    ...(message.metadata?.liaStage ? { metadata: { liaStage: message.metadata.liaStage } } : {}),
-    parts: (message.parts || [])
-      .filter((part) => part?.type === "text")
-      .map((part) => ({ type: "text", text: part.text || "" })),
-    attachments: (message.parts || [])
-      .filter((part) => part?.type === "file")
-      .map((part) => ({
-        filename: part.filename || "فایل پیوست",
-        mediaType: part.mediaType || "application/octet-stream",
-      })),
+    ...(message.metadata ? {
+      metadata: {
+        ...(message.metadata.liaStage ? { liaStage: message.metadata.liaStage } : {}),
+        ...(message.metadata.liaAction ? { liaAction: message.metadata.liaAction } : {}),
+        ...(message.metadata.screenshotReason ? { screenshotReason: message.metadata.screenshotReason } : {}),
+        ...(message.metadata.ticketId ? { ticketId: message.metadata.ticketId } : {}),
+      },
+    } : {}),
+    parts: (message.parts || []).flatMap((part) => {
+      if (part?.type === "text") return [{ type: "text", text: part.text || "" }];
+      if (part?.type !== "file") return [];
+      const base = { type: "file", filename: part.filename || "فایل پیوست", mediaType: part.mediaType || "application/octet-stream" };
+      return typeof part.url === "string" && part.url.startsWith("data:") && part.url.length <= 4 * 1024 * 1024
+        ? [{ ...base, url: part.url }]
+        : [base];
+    }),
   }));
 }
 

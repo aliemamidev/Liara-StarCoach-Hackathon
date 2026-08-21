@@ -8,6 +8,7 @@ function cleanMessage(message) {
     id: String(message?.id || randomUUID()),
     role: String(message?.role || "user"),
     parts: Array.isArray(message?.parts) ? message.parts : [],
+    ...(message?.metadata && typeof message.metadata === "object" ? { metadata: message.metadata } : {}),
   };
 }
 
@@ -33,7 +34,7 @@ function responseChat(chat) {
     titleGenerated: chat.titleGenerated,
     createdAt: chat.createdAt.getTime(),
     updatedAt: chat.updatedAt.getTime(),
-    messages: chat.messages.map((message) => ({ id: message.id, role: message.role, parts: message.parts })),
+    messages: chat.messages.map((message) => ({ id: message.id, role: message.role, parts: message.parts, ...(message.metadata ? { metadata: message.metadata } : {}) })),
   };
 }
 
