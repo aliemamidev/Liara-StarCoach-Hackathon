@@ -1,9 +1,9 @@
 import { randomUUID } from "node:crypto";
 import { prisma } from "@/lib/prisma";
 import { normalizeKnowledgeText } from "@/lib/lia-brain";
+import { MAX_DATA_URL_LENGTH } from "@/lib/chat-message-validation.mjs";
 
 const MAX_TEXT = 5000;
-const MAX_ATTACHMENT_DATA = 4 * 1024 * 1024;
 
 export const CONTACT_REQUEST_MESSAGE = `## اطلاعات تماس لازم است
 
@@ -41,7 +41,7 @@ export function sanitizeConversation(messages = []) {
 
 export function sanitizeAttachments(messages = []) {
   return messages.flatMap((message) => (message?.parts || []).filter((part) => part?.type === "file").map((part) => {
-    const url = typeof part.url === "string" && part.url.startsWith("data:") && part.url.length <= MAX_ATTACHMENT_DATA ? part.url : undefined;
+    const url = typeof part.url === "string" && part.url.startsWith("data:") && part.url.length <= MAX_DATA_URL_LENGTH ? part.url : undefined;
     return {
       filename: String(part.filename || "فایل پیوست").slice(0, 180),
       mediaType: String(part.mediaType || "application/octet-stream").slice(0, 120),
