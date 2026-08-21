@@ -2,13 +2,16 @@ import fs from "node:fs/promises";
 import path from "node:path";
 import MeiliSearch from "meilisearch";
 
-const MAX_RESULTS = 1;
-const MAX_BODY_LENGTH = 4200;
+const MAX_RESULTS = 4;
+const MAX_BODY_LENGTH = 3600;
+const MAX_CONTEXT_LENGTH = 12000;
 const CHUNK_LENGTH = 2200;
+const CHUNK_OVERLAP = 180;
 const DOCUMENTATION_ROOTS = ["public/llms"];
 const ONLINE_INDEX = "docs";
 const DATABASE_QUERY_PATTERN = /(?:دیتابیس|پایگاه\s+داده|database|postgres(?:ql)?|mysql|mariadb|mongodb|mongo|redis|rabbitmq|elasticsearch|elastic\s*search|mssql|sql\s*server|sqlite|بکاپ|backup|بازیابی|restore|connection\s*pool|اتصال\s+به\s+(?:دیتابیس|پایگاه))/iu;
 const SEARCH_STOP_WORDS = new Set(["به", "در", "برای", "با", "از", "و", "را", "یک", "این", "آن", "برنامه", "روش", "است", "های", "کردن"]);
+const DOCUMENTATION_HOST_PATTERN = /(?:^|\.)liara\.ir$/i;
 let documentsPromise;
 let onlineClient;
 
@@ -22,7 +25,7 @@ function normalizeText(value) {
 }
 
 function tokens(value) {
-  return (normalizeText(value).toLocaleLowerCase("fa").match(/[\p{L}\p{N}]+/gu) || [])
+  return (normalizeText(value).toLocaleLowerCase("fa").match(/[\p{L}\p{N}]+(?:[._-][\p{L}\p{N}]+)*/gu) || [])
     .filter((token) => !SEARCH_STOP_WORDS.has(token));
 }
 
@@ -31,6 +34,8 @@ const QUERY_SYNONYMS = [
   [/\bnode(?:\.js)?\b|نود/iu, "node nodejs node.js نود"],
   [/\bplan\b|پلن|قیمت/iu, "plan pricing price پلن قیمت"],
   [/database|postgres(?:ql)?|mysql|mongodb|redis|دیتابیس|پایگاه\s+داده/iu, "database دیتابیس پایگاه داده postgres postgresql mysql mongodb redis"],
+  [/error|خطا|ارور|exception|مشکل/iu, "error خطا ارور exception مشکل"],
+  [/env|environment|محیط|متغیر\s+محیطی/iu, "env environment محیط متغیر محیطی"],
 ];
 
 function tokenVariants(token) {
@@ -56,6 +61,7 @@ async function findFiles(directory) {
 
 function cleanMarkdown(content) {
   return String(content || "")
+    .replace(/^\uFEFF?Original link:\s*\S+\s*$/gim, "")
     .replace(/^import\s.+$/gm, "")
     .replace(/^export\s.+$/gm, "")
     .replace(/<[^>]+>/g, " ")
@@ -71,37 +77,57 @@ function titleFrom(content, filePath) {
   return heading ? normalizeText(heading.replace(/[*_`]/g, "")) : path.basename(filePath, path.extname(filePath)).replace(/[-_]/g, " ");
 }
 
-function docsUrl(content, relativePath) {
-  const originalLink = content.match(/^Original link:\s*(\S+)/mi)?.[1];
-  if (originalLink) return originalLink;
-  const route = relativePath.replace(/^src[\\/]pages[\\/]/, "").replace(/^public[\\/]llms[\\/]/, "").replace(/\.(md|mdx|html?)$/i, "").replace(/[\\\\]/g, "/");
-  return `https://docs.liara.ir/${route.replace(/\/about$/, "")}/`;
+function docsUrl(content) {
+  const originalLink = content.match(/^\uFEFF?Original link:\s*(\S+)/mi)?.[1];
+  return isValidDocumentationUrl(originalLink) ? originalLink : null;
+}
+
+function splitTextSafely(text) {
+  const chunks = [];
+  let remaining = String(text || "").trim();
+  while (remaining) {
+    if (remaining.length <= CHUNK_LENGTH) {
+      chunks.push(remaining);
+      break;
+    }
+    let cut = remaining.lastIndexOf("\n", CHUNK_LENGTH);
+    if (cut < CHUNK_LENGTH * 0.55) cut = remaining.lastIndexOf(" ", CHUNK_LENGTH);
+    if (cut < CHUNK_LENGTH * 0.55) cut = CHUNK_LENGTH;
+    chunks.push(remaining.slice(0, cut).trim());
+    remaining = remaining.slice(Math.max(cut - CHUNK_OVERLAP, 0)).trim();
+  }
+  return chunks.filter(Boolean);
 }
 
 function splitIntoChunks(content, fallbackTitle) {
-  const lines = cleanMarkdown(content).split("\n");
+  const lines = cleanMarkdown(content).split(/\r?\n/);
   const chunks = [];
   let section = fallbackTitle;
   let buffer = [];
+  let inCodeFence = false;
 
   const flush = () => {
-    const text = normalizeText(buffer.join(" "));
+    const text = buffer.join("\n").trim();
+    buffer = [];
     if (!text) return;
-    for (let offset = 0; offset < text.length; offset += CHUNK_LENGTH) {
-      const body = text.slice(offset, offset + CHUNK_LENGTH).trim();
+    for (const piece of splitTextSafely(text)) {
+      const body = normalizeText(piece);
       if (body) chunks.push({ section, body });
     }
-    buffer = [];
   };
 
   for (const line of lines) {
-    const heading = line.match(/^#{1,4}\s+(.+)$/)?.[1];
+    const heading = !inCodeFence ? line.match(/^#{1,4}\s+(.+)$/)?.[1] : null;
     if (heading) {
       flush();
-      section = normalizeText(heading.replace(/[*_`]/g, "")) || fallbackTitle;
+      const nextSection = normalizeText(heading.replace(/[*_`]/g, "")) || fallbackTitle;
+      if (/^all\s+links?$/iu.test(nextSection)) break;
+      section = nextSection;
     } else {
       buffer.push(line);
     }
+    if (/^\s*```/.test(line)) inCodeFence = !inCodeFence;
+    if (!inCodeFence && !line.trim()) flush();
   }
   flush();
   return chunks.length ? chunks : [{ section: fallbackTitle, body: normalizeText(cleanMarkdown(content)) }];
@@ -119,11 +145,11 @@ async function loadDocuments() {
     const raw = await fs.readFile(filePath, "utf8");
     const relativePath = path.relative(process.cwd(), filePath).replaceAll(path.sep, "/");
     const title = titleFrom(raw, filePath);
-    const url = docsUrl(raw, relativePath);
+    const url = docsUrl(raw);
     for (const chunk of splitIntoChunks(raw, title)) {
       const body = chunk.body.slice(0, MAX_BODY_LENGTH);
       if (!body) continue;
-      const dedupeKey = `${url}|${chunk.section}|${body}`;
+      const dedupeKey = `${url || relativePath}|${chunk.section}|${body}`;
       if (seen.has(dedupeKey)) continue;
       seen.add(dedupeKey);
       documents.push({
@@ -149,11 +175,11 @@ function scoreDocument(document, query, queryTokens) {
   const sectionMatches = queryTokens.filter((token) => matchesToken(token, document.sectionTokens)).length;
   const pathMatches = queryTokens.filter((token) => matchesToken(token, document.pathTokens)).length;
   const structuralMatches = titleMatches + sectionMatches + pathMatches;
-  let score = matchingTokens.length / Math.max(queryTokens.length, 1);
-  if (document.title.toLocaleLowerCase("fa").includes(normalizedQuery)) score += 3;
-  if (document.section.toLocaleLowerCase("fa").includes(normalizedQuery)) score += 1.5;
-  if (document.body.toLocaleLowerCase("fa").includes(normalizedQuery)) score += 1.5;
-  score += titleMatches * 1.8 + sectionMatches * 1.4 + pathMatches * 0.9;
+  let score = (matchingTokens.length / Math.max(queryTokens.length, 1)) * 2;
+  if (normalizedQuery.length > 3 && document.title.toLocaleLowerCase("fa").includes(normalizedQuery)) score += 4;
+  if (normalizedQuery.length > 3 && document.section.toLocaleLowerCase("fa").includes(normalizedQuery)) score += 2.5;
+  if (normalizedQuery.length > 5 && document.body.toLocaleLowerCase("fa").includes(normalizedQuery)) score += 2;
+  score += titleMatches * 2.2 + sectionMatches * 1.6 + pathMatches;
   score += documentationDomainBoost(document.path, query);
   return { document, score, coverage: matchingTokens.length, structuralMatches };
 }
@@ -193,17 +219,23 @@ export async function searchDocumentation(query) {
     documentsPromise ||= loadDocuments();
     const documents = await documentsPromise;
     const queryTokens = [...new Set(tokens(normalizeText(query)))];
+    const minimumCoverage = queryTokens.length <= 2
+      ? 1
+      : queryTokens.length <= 5
+        ? Math.ceil(queryTokens.length * 0.5)
+        : Math.max(2, Math.ceil(queryTokens.length * 0.35));
     const ranked = documents
       .map((document) => scoreDocument(document, query, queryTokens))
-      .filter(({ coverage, structuralMatches }) => structuralMatches > 0 && coverage >= Math.max(1, Math.ceil(queryTokens.length * 0.5)))
+      .filter(({ coverage, structuralMatches }) => coverage >= minimumCoverage && (structuralMatches > 0 || coverage >= 2))
       .sort((a, b) => b.score - a.score);
     const bestScore = ranked[0]?.score || 0;
     const selected = [];
-    const seenUrls = new Set();
+    const seenSections = new Set();
     for (const item of ranked) {
-      if (item.score < bestScore * 0.65 || seenUrls.has(item.document.url)) continue;
+      const sectionKey = `${item.document.url || item.document.path}|${item.document.section}`;
+      if (item.score < bestScore * 0.45 || seenSections.has(sectionKey)) continue;
       selected.push(item);
-      seenUrls.add(item.document.url);
+      seenSections.add(sectionKey);
       if (selected.length >= MAX_RESULTS) break;
     }
     return {
@@ -231,7 +263,7 @@ function onlineHitToDocumentation(hit) {
   return {
     title,
     path: hit.path || "",
-    url: hit.url || "https://docs.liara.ir/",
+    url: isValidDocumentationUrl(hit.url) ? hit.url : null,
     section: normalizeText(hit.element || hit.section || title),
     body: body.slice(0, MAX_BODY_LENGTH),
     platform: hit.platform,
@@ -253,15 +285,44 @@ export async function searchDocumentationOnline(query) {
   }
 }
 
+export function isValidDocumentationUrl(value) {
+  if (!value) return false;
+  try {
+    const url = new URL(value);
+    return url.protocol === "https:" && DOCUMENTATION_HOST_PATTERN.test(url.hostname);
+  } catch {
+    return false;
+  }
+}
+
+const SENSITIVE_TEXT_PATTERNS = [
+  /(?:api[_ -]?key|token|secret|password|رمز(?:\s*عبور)?|کلید(?:\s+خصوصی)?|پسورد)\s*[:=]\s*[^\s`,'")]+/giu,
+  /(?:postgres(?:ql)?|mysql|mongodb|redis):\/\/[^\s`'"<>]+/giu,
+  /\b(?:bearer|basic)\s+[A-Za-z0-9._~+/=-]{12,}/giu,
+  /-----BEGIN [^-]+ PRIVATE KEY-----[\s\S]*?-----END [^-]+ PRIVATE KEY-----/giu,
+  /\b(?:sk|pk|ghp|github_pat)_[A-Za-z0-9_-]{12,}/g,
+];
+
+export function redactSensitiveText(value) {
+  return SENSITIVE_TEXT_PATTERNS.reduce((text, pattern) => text.replace(pattern, "[اطلاعات محرمانه حذف شد]"), String(value || ""));
+}
+
 export function formatDocumentationContext(hits) {
-  return hits.map((hit, index) => `<documentation-source id="${index + 1}">
+  let totalLength = 0;
+  return hits.map((hit, index) => {
+    if (totalLength >= MAX_CONTEXT_LENGTH) return "";
+    const body = redactSensitiveText(hit.body).slice(0, Math.max(0, MAX_CONTEXT_LENGTH - totalLength));
+    const source = `<documentation-source id="${index + 1}">
 عنوان سند: ${hit.title}
 مسیر فایل: ${hit.path}
-لینک Documentation: ${hit.url}
+لینک Documentation: ${hit.url || ""}
 بخش مربوطه: ${hit.section}
 محتوا:
-${hit.body}
-</documentation-source>`).join("\n\n");
+${body}
+</documentation-source>`;
+    totalLength += source.length;
+    return source;
+  }).filter(Boolean).join("\n\n");
 }
 
 export function toInternalDocumentationUrl(value) {
@@ -277,9 +338,24 @@ export function toInternalDocumentationUrl(value) {
 
 export function formatDocumentationSources(hits) {
   if (!hits?.length) return "";
-  const unique = [...new Map(hits.map((hit) => [hit.url || hit.path || hit.title, hit])).values()].slice(0, 1);
+  const unique = [...new Map(hits.filter((hit) => isValidDocumentationUrl(hit.url)).map((hit) => [hit.url, hit])).values()].slice(0, 1);
+  if (!unique.length) return "";
   return `\n\n## منبع پاسخ\n\n📄 منابع مرتبط:\n\n${unique.map((hit) => {
-    const isWeb = hit.sourceType === "WEB";
-    return `- ${isWeb ? `[${hit.title}](${hit.url})` : `[${hit.title}](${hit.url || "https://docs.liara.ir/"})`}`;
+    const title = String(hit.title || "Documentation لیارا").replace(/[\[\]]/g, "");
+    return `- [${title}](${hit.url})`;
   }).join("\n")}`;
+}
+
+export function toPublicDocumentationHit(hit) {
+  if (!isValidDocumentationUrl(hit?.url)) return null;
+  return {
+    id: hit.id,
+    title: hit.title,
+    path: hit.path,
+    url: hit.url,
+    section: hit.section,
+    platform: hit.platform,
+    element: hit.element,
+    type: hit.type,
+  };
 }

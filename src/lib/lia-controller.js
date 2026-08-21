@@ -80,26 +80,30 @@ function scoreHit(hit, queryTokens) {
 function isStrongEvidence(hits, query) {
   const queryTokens = [...new Set(tokens(query))];
   if (!queryTokens.length) return false;
-  const requiredCoverage = Math.max(1, Math.ceil(queryTokens.length * 0.5));
+  const requiredCoverage = queryTokens.length <= 2
+    ? 1
+    : queryTokens.length <= 5
+      ? Math.ceil(queryTokens.length * 0.5)
+      : Math.max(2, Math.ceil(queryTokens.length * 0.35));
   const normalizedQuery = normalizeText(query).toLocaleLowerCase("fa");
   return hits.some((hit) => {
     const title = normalizeText(hit.title).toLocaleLowerCase("fa");
     const coverage = hitCoverage(hit, queryTokens);
     const structuralText = normalizeText(`${hit.title || ""} ${hit.section || ""} ${hit.path || ""}`).toLocaleLowerCase("fa");
     const structuralMatch = queryTokens.some((token) => structuralText.includes(token));
-    const titleMatch = normalizedQuery.length > 1 && title.includes(normalizedQuery);
-    return structuralMatch && (scoreHit(hit, queryTokens) >= 1.5 || (coverage >= requiredCoverage && (queryTokens.length > 1 || titleMatch)));
+    const exactMatch = normalizedQuery.length > 3 && [title, normalizeText(hit.section), normalizeText(hit.body)].some((value) => value.toLocaleLowerCase("fa").includes(normalizedQuery));
+    return exactMatch || (coverage >= requiredCoverage && (structuralMatch || scoreHit(hit, queryTokens) >= 1.5));
   });
 }
 
 function mergeHits(...groups) {
   const merged = new Map();
   for (const hit of groups.flat()) {
-    const key = hit.url || hit.path || hit.title;
+    const key = `${hit.url || hit.path || hit.title}|${hit.section || ""}`;
     const existing = merged.get(key);
     if (!existing || (hit.score || 0) > (existing.score || 0)) merged.set(key, hit);
   }
-  return [...merged.values()];
+  return [...merged.values()].sort((a, b) => (b.score || 0) - (a.score || 0));
 }
 
 function previousStage(messages) {
@@ -109,6 +113,16 @@ function previousStage(messages) {
 
 function allUserText(messages) {
   return messages.filter((message) => message.role === "user").map((message) => latestUserText([message])).filter(Boolean).join(" ");
+}
+
+function retrievalText(messages, latestQuery) {
+  const userTexts = messages
+    .filter((message) => message.role === "user")
+    .map((message) => latestUserText([message]))
+    .filter(Boolean);
+  const recent = userTexts.slice(-3);
+  if (!recent.includes(latestQuery)) recent.push(latestQuery);
+  return recent.join(" ").trim().slice(0, 6000);
 }
 
 export function isGreeting(query) {
@@ -121,7 +135,7 @@ function hasImageAttachment(messages) {
 }
 
 const IN_SCOPE_PATTERN = /(?:هوش مصنوعی|یادگیری ماشین|یادگیری ماشینی|مدل زبان|چت‌?بات|الگوریتم|پرامپت|توکن|پردازش متن|تکنولوژی|فناوری|کامپیوتر|رایانه|برنامه‌نویسی|برنامه نویسی|کدنویسی|کد|پایتون|جاوااسکریپت|تایپ‌?اسکریپت|جاوا|php|node(?:\.js)?|react|next(?:\.js)?|vue|sql|api|sdk|http|سرور|کلود|ابری|دیتابیس|پایگاه داده|داده|شبکه|امنیت|رمزنگاری|لینوکس|ویندوز|گیت|docker|کانتینر|استقرار|دیپلوی|deploy|دامنه|dns|وب‌?سایت|سایت|اپلیکیشن|نرم‌افزار|نرم افزار|لینک|فایل|خطا|ارور|لاگ|پایگاه دانش|مستندات|documentation|لیارا|liara|پنل|حساب کاربری|سرویس|صورتحساب|فاکتور|ذخیره‌?سازی|پشتیبان|بکاپ|redis|mysql|mongodb|postgres|آی‌?پی|پورت|ssl|tls|ssh|cors|cdn|github|gitlab|اسکرین‌?شات|screenshot)/iu;
-const TECHNICAL_SYMPTOM_PATTERN = /(?:برنامه\s*(?:م|ام|من)|اپلیکیشن\s*(?:م|ام|من)|سایت\s*(?:م|ام|من)|کار نمی\s*(?:کند|کنه)|درست نیست|خراب شده|مشکل دارم|خطا دارم|ارور دارم)/iu;
+const TECHNICAL_SYMPTOM_PATTERN = /(?:برنامه\s*(?:م|ام|من)|اپلیکیشن\s*(?:م|ام|من)|سایت\s*(?:م|ام|من)|کار نمی\s*(?:کند|کنه)|درست نیست|خراب شده|مشکل دارم|خطا دارم|ارور دارم|صفحه\s+(?:سفید|سیاه)|اسکرین\s*شات)/iu;
 
 const GENERAL_TECHNICAL_EXPLANATION_PATTERN = /(?:چیست|چیستند|یعنی چه|چه تفاوتی|تفاوت|تعریف|معنی|چگونه کار می\s*کند|چطور کار می\s*کند|چطور(?:\s+\S+){0,8}\s*(?:ایجاد|بساز|ساخت)\s*(?:کنم|کنیم)?|چگونه(?:\s+\S+){0,8}\s*(?:ایجاد|بساز|ساخت)\s*(?:کنم|کنیم)?|توضیح بده|معرفی کن|what is|what are|difference between|how does .* work)/iu;
 const LIARA_SPECIFIC_PATTERN = /(?:لیارا|liara|پنل|قیمت|پلن|صورتحساب|فاکتور|سرویس لیارا|مستندات لیارا|حساب کاربری|دامنه\s*من|دامنه\s*ام|اپلیکیشن\s*من|برنامه\s*ام|در لیارا|روی لیارا)/iu;
@@ -201,7 +215,7 @@ export async function createLiaControllerPlan(messages, settings = {}) {
   const query = latestUserText(messages);
   const priorStage = previousStage(messages);
   const conversation = allUserText(messages);
-  const retrievalQuery = `${conversation} ${query}`.trim();
+  const retrievalQuery = retrievalText(messages, query);
   const contextQuery = normalizeText(`${conversation} ${query}`);
 
   if (isGreeting(query)) {
@@ -240,15 +254,18 @@ export async function createLiaControllerPlan(messages, settings = {}) {
   const searchTrace = ["brain"];
   let brainHits = [];
   try {
-    brainHits = await searchKnowledge(query);
-    if (!isStrongKnowledgeEvidence(brainHits, query) && conversation !== query) brainHits = await searchKnowledge(retrievalQuery);
+    const directBrainHits = await searchKnowledge(query);
+    brainHits = isStrongKnowledgeEvidence(directBrainHits, query)
+      ? directBrainHits
+      : await searchKnowledge(retrievalQuery);
   } catch { brainHits = []; }
   if (isStrongKnowledgeEvidence(brainHits, query) || isStrongKnowledgeEvidence(brainHits, retrievalQuery)) {
     return { mode: LIA_STAGES.ANSWER, stage: LIA_STAGES.ANSWER, query, hits: [], brainHits, searchTrace, includeSources: !generalTechnical };
   }
+  brainHits = [];
 
   searchTrace.push("local_docs");
-  const local = await searchDocumentation(`${conversation} ${query}`);
+  const local = await searchDocumentation(retrievalQuery);
   let hits = local.hits;
   let documentationAvailable = local.available;
 
@@ -301,18 +318,19 @@ export async function createLiaControllerPlan(messages, settings = {}) {
   };
 }
 
-const INTERNAL_OUTPUT_PATTERN = /system prompt|developer message|internal reasoning|زنجیرهٔ فکر|تحلیل داخلی|پرامپت\s*سیستم|قوانین\s*داخلی|دستورهای\s*داخلی/i;
-const DANGEROUS_COMMAND_PATTERN = /(?:rm\s+-rf|docker\s+system\s+prune(?:\s+-a)?|DROP\s+DATABASE|TRUNCATE\s+TABLE|git\s+push\s+--force|kubectl\s+delete\s+.*--all)/i;
+const INTERNAL_OUTPUT_PATTERN = /system prompt|developer message|internal reasoning|زنجیرهٔ فکر|تحلیل داخلی|پرامپت\s*سیستم|قوانین\s*داخلی|دستورهای\s*داخلی|افشای\s+دستور/i;
+const SECRET_OUTPUT_PATTERN = /(?:api[_ -]?key|token|secret|password|رمز(?:\s*عبور)?|کلید(?:\s+خصوصی)?|پسورد)\s*[:=]\s*[^\s`,'")]+|\b(?:bearer|basic)\s+[A-Za-z0-9._~+/=-]{12,}|(?:postgres(?:ql)?|mysql|mongodb|redis):\/\/[^\s`'"<>]+|-----BEGIN [^-]+ PRIVATE KEY-----/iu;
+const DANGEROUS_COMMAND_PATTERN = /(?:\brm\s+-rf\b|docker\s+system\s+prune(?:\s+-a)?|\b(?:drop|truncate)\s+(?:database|table|schema|index)\b|\bdelete\s+from\b|git\s+push\s+--force(?:-with-lease)?|kubectl\s+delete\s+.*--all|(?:liara|aws|gcloud)\s+.*\b(?:delete|destroy|terminate)\b)/iu;
 
 export function isUnsafeLiaDraft(text) {
   const value = String(text || "");
-  return INTERNAL_OUTPUT_PATTERN.test(value) || DANGEROUS_COMMAND_PATTERN.test(value);
+  return INTERNAL_OUTPUT_PATTERN.test(value) || SECRET_OUTPUT_PATTERN.test(value) || DANGEROUS_COMMAND_PATTERN.test(value);
 }
 
 export function validateLiaDraft(text) {
   const value = String(text || "").trim();
   if (!value || value.length > 12000) return false;
-  if (!value.includes("## پاسخ")) return false;
+  if (!/^##\s*پاسخ(?:\s|$)/u.test(value)) return false;
   if (/##\s*منبع پاسخ|<documentation-source|https?:\/\//i.test(value)) return false;
   if (isUnsafeLiaDraft(value)) return false;
   return true;

@@ -1,4 +1,4 @@
-import { searchDocumentation, searchDocumentationOnline } from "@/lib/docs-search";
+import { searchDocumentation, searchDocumentationOnline, toPublicDocumentationHit } from "@/lib/docs-search";
 
 export default async function handler(req, res) {
   if (req.method !== "GET") {
@@ -12,5 +12,9 @@ export default async function handler(req, res) {
   let result = await searchDocumentation(query);
   if (!result.available || !result.hits.length) result = await searchDocumentationOnline(query);
   if (!result.available) return res.status(503).json({ error: "جست‌وجوی Documentation در دسترس نیست." });
-  return res.status(200).json({ hits: result.hits.slice(0, 10) });
+  const hits = [...new Map(result.hits
+    .map(toPublicDocumentationHit)
+    .filter(Boolean)
+    .map((hit) => [hit.url, hit])).values()].slice(0, 10);
+  return res.status(200).json({ hits });
 }
