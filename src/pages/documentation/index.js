@@ -4,6 +4,7 @@ import Link from "next/link";
 import PlatformIcon from "@/components/Common/icons";
 import Section from "@/components/Common/section";
 import Head from "next/head";
+import Image from "next/image";
 import {
   GoContainer,
   GoServer,
@@ -472,7 +473,7 @@ export default function Home() {
         >
           <div className="grid md:grid-cols-4 gap-4">
             {GETTING_STARTED_ITEMS.map(item =>
-              <Link href={item.link}>
+              <Link key={item.link} href={item.link}>
                 <Card className="flex w-full cursor-pointer items-center justify-between">
                   <div className="flex items-center gap-3">
                     <div className="w-[40px] p-1  bg-[#333] rounded-lg">
@@ -491,7 +492,7 @@ export default function Home() {
         <Section id="home-products" title={"محصولات لیارا"}>
           <div className="grid md:grid-cols-2 gap-4">
             {BEST_PRODUCTS.map(item =>
-              <Link href={item.link}>
+              <Link key={item.link} href={item.link}>
                 <Card className="min-h-[180px] flex flex-col cursor-pointer justify-between items-start w-full">
                   <div className="w-full">
                     <div className="flex items-center justify-between gap-3">
@@ -514,7 +515,7 @@ export default function Home() {
           <div className="h-4" />
           <div className="grid md:grid-cols-3 gap-4">
             {PRODUCTS.map(item =>
-              <Link href={item.link}>
+              <Link key={item.link} href={item.link}>
                 <Card className="min-h-[180px] flex flex-col cursor-pointer justify-between items-start w-full">
                   <div className="w-full">
                     <div className="flex items-center justify-between gap-3">
@@ -539,7 +540,7 @@ export default function Home() {
         <Section id="home-references" title={"ارجاعات"}>
           <div className="grid md:grid-cols-3 gap-4">
             {REFERENCES.map(item =>
-              <Card className="min-h-[180px] flex flex-col justify-between items-start w-full">
+              <Card key={item.link} className="min-h-[180px] flex flex-col justify-between items-start w-full">
                 <div>
                   <div className="flex items-center justify-between gap-3">
                     <h4>
@@ -564,7 +565,7 @@ export default function Home() {
         <Section id="home-most-visited" title={"پربازدیدترین مستندات لیارا"}>
           <ul className="pr-4">
             {MOST_VISITED_LINKS.map(item =>
-              <li
+              <li key={item.alt}
                 style={{
                   listStyle: "persian",
                   textDecorationColor: "#9ca3af"
@@ -587,7 +588,7 @@ export default function Home() {
         <Section id="github-repos" title={"با گیت‌هاب لیارا شروع کنید"}>
           <ul className="grid md:grid-cols-4 gap-4">
             {GETTING_START_DATA.map(item =>
-              <a target="_blank" href={item.link}>
+              <a key={item.link} target="_blank" href={item.link}>
                 <Card
                   dir="ltr"
                   style={{
@@ -602,8 +603,11 @@ export default function Home() {
                   className={`w-full cursor-pointer  rounded-none `}
                 >
                   <div className="flex gap-2 w-full items-center">
-                    <img
+                    <Image
                       src="/static/images/github.svg"
+                      alt="GitHub"
+                      width={18}
+                      height={18}
                       className=" w-[18px] invert invert-icon"
                     />
                     <p>
@@ -636,8 +640,11 @@ export default function Home() {
                 className={`w-full h-full cursor-pointer relative  rounded-none `}
               >
                 <div className="flex  flex-col justify-center gap-2 w-full items-center">
-                  <img
+                  <Image
                     src="/static/images/github.svg"
+                    alt="GitHub"
+                    width={25}
+                    height={25}
                     className=" w-[25px] mt-[-7px] invert invert-icon"
                   />
                   <p className="font-mono mt-[-12px]">@liara_cloud</p>

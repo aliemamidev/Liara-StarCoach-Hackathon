@@ -314,6 +314,10 @@ function rankDocuments(documents, query) {
 function documentationDomainBoost(relativePath, query) {
   const normalizedPath = String(relativePath || "").replaceAll("\\", "/").toLowerCase();
   let boost = 0;
+  if (/(?:\bssh\b|shell|سرور|دسترسی\s+به\s+سرور)/iu.test(query)) {
+    if (normalizedPath.includes("/iaas/")) boost += 7;
+    else if (normalizedPath.includes("/dbaas/")) boost -= 3;
+  }
   const databaseTechnology = [
     [/(?:postgres(?:ql)?|پستگرس)/iu, "/postgresql/"],
     [/(?:mysql|مای.?اس.?کیو.?ال)/iu, "/mysql/"],

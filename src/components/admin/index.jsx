@@ -244,6 +244,95 @@ function AnalyticsPage({ analytics = {} }) {
   const weekly = analytics.weekly || [];
   const max = Math.max(...weekly.map((item) => item.value), 1);
   const signals = analytics.problemSignals || [];
+
+  return (
+    <div className="grid gap-5 xl:grid-cols-[minmax(0,1.4fr)_minmax(320px,.6fr)]">
+      <Card className="p-5">
+        <div className="mb-8 flex items-center justify-between">
+          <div>
+            <p className="text-[11px] font-bold text-[#8b99ab]">روند روزانه</p>
+            <h2 className="mt-1 text-[17px] font-extrabold text-[#1a2940]">
+              تعداد پیام‌ها و پرسش‌های بدون پاسخ
+            </h2>
+          </div>
+          <div className="flex items-center gap-3 text-[10px] font-bold text-[#7c899a]">
+            <span className="flex items-center gap-1.5">
+              <i className="h-2 w-2 rounded-full bg-[#4e79e8]" />
+              کل پیام‌ها
+            </span>
+            <span className="flex items-center gap-1.5">
+              <i className="h-2 w-2 rounded-full bg-[#f19a33]" />
+              بدون پاسخ
+            </span>
+          </div>
+        </div>
+        <div className="flex h-64 items-end gap-2 sm:gap-5" dir="ltr">
+          {weekly.map((item) => (
+            <div key={item.day} className="flex h-full flex-1 flex-col items-center justify-end gap-2">
+              <div className="flex h-[88%] w-full items-end justify-center gap-1.5 sm:gap-2">
+                <div
+                  className="w-1/2 max-w-8 rounded-t-lg bg-[#4e79e8]"
+                  style={{ height: `${(item.value / max) * 94}%` }}
+                />
+                <div
+                  className="w-1/2 max-w-8 rounded-t-lg bg-[#f3b15d]"
+                  style={{ height: `${(item.unanswered / max) * 94}%` }}
+                />
+              </div>
+              <span dir="rtl" className="text-[10px] font-semibold text-[#9aa6b7]">
+                {item.day}
+              </span>
+            </div>
+          ))}
+        </div>
+      </Card>
+      <Card className="p-5">
+        <SectionTitle label="مشکلات رایج کاربران" action="مشاهده داده‌ها" href="/admin?section=messages" />
+        <div className="space-y-5">
+          {signals.map((signal) => (
+            <div key={signal.label} className="flex items-start gap-3">
+              <span
+                className={`flex h-9 w-9 shrink-0 items-center justify-center rounded-xl ${toneClasses[signal.tone]?.icon || toneClasses.slate.icon}`}
+              >
+                {signal.tone === "orange" ? (
+                  <AlertTriangle size={16} />
+                ) : signal.tone === "red" ? (
+                  <XCircle size={16} />
+                ) : (
+                  <CircleHelp size={16} />
+                )}
+              </span>
+              <div className="min-w-0 flex-1">
+                <div className="flex items-center justify-between gap-2">
+                  <p className="text-[11px] font-extrabold text-[#3c4b60]">{signal.label}</p>
+                  <span className="text-[13px] font-extrabold text-[#28384e]">{signal.value}</span>
+                </div>
+                <p className="mt-1 text-[10px] text-[#9aa6b7]">{signal.description}</p>
+                <div className="mt-2 h-1.5 rounded-full bg-[#edf1f5]">
+                  <div
+                    className={`h-full rounded-full ${toneClasses[signal.tone]?.line || toneClasses.slate.line}`}
+                    style={{ width: `${signal.progress}%` }}
+                  />
+                </div>
+              </div>
+            </div>
+          ))}
+        </div>
+        <div className="mt-8 rounded-2xl bg-[#f4f7fb] p-4">
+          <p className="text-[10px] font-bold text-[#8491a3]">نرخ حل مسئله</p>
+          <p className="mt-1 text-2xl font-extrabold text-[#23344d]">{analytics.resolutionRate ?? 0}٪</p>
+          <p className="mt-1 text-[10px] text-[#0e9a84]">محاسبه‌شده از پیام‌ها</p>
+        </div>
+      </Card>
+    </div>
+  );
+}
+
+/*
+function AnalyticsPage({ analytics = {} }) {
+  const weekly = analytics.weekly || [];
+  const max = Math.max(...weekly.map((item) => item.value), 1);
+  const signals = analytics.problemSignals || [];
   return <div className="grid gap-5 xl:grid-cols-[minmax(0,1.4fr)_minmax(320px,.6fr)]"><Card className="p-5"><div className="mb-8 flex items-center justify-between"><div><p className="text-[11px] font-bold text-[#8b99ab]">روند روزانه</p><h2 className="mt-1 text-[17px] font-extrabold text-[#1a2940]">تعداد پیام‌ها و پرسش‌های بدون پاسخ</h2></div><div className="flex items-center gap-3 text-[10px] font-bold text-[#7c899a]"><span className="flex items-center gap-1.5"><i className="h-2 w-2 rounded-full bg-[#4e79e8]" />کل پیام‌ها</span><span className="flex items-center gap-1.5"><i className="h-2 w-2 rounded-full bg-[#f19a33]" />بدون پاسخ</span></div></div><div className="flex h-64 items-end gap-2 sm:gap-5" dir="ltr">{weekly.map((item) => <div key={item.day} className="flex h-full flex-1 flex-col items-center justify-end gap-2"><div className="flex h-[88%] w-full items-end justify-center gap-1.5 sm:gap-2"><div className="w-1/2 max-w-8 rounded-t-lg bg-[#4e79e8]" style={{ height: `${(item.value / max) * 94}%` }} /><div className="w-1/2 max-w-8 rounded-t-lg bg-[#f3b15d]" style={{ height: `${(item.unanswered / max) * 94}%` }} /></div><span dir="rtl" className="text-[10px] font-semibold text-[#9aa6b7]">{item.day}</span></div>)}</div></Card><Card className="p-5"><SectionTitle label="مشکلات رایج کاربران" action="مشاهده داده‌ها" href="/admin?section=messages" /><div className="space-y-5">{signals.map((signal) => <div key={signal.label} className="flex items-start gap-3"><span className={`flex h-9 w-9 shrink-0 items-center justify-center rounded-xl ${toneClasses[signal.tone]?.icon || toneClasses.slate.icon}`}>{signal.tone === "orange" ? <AlertTriangle size={16} /> : signal.tone === "red" ? <XCircle size={16} /> : <CircleHelp size={16} /></span><div className="min-w-0 flex-1"><div className="flex items-center justify-between gap-2"><p className="text-[11px] font-extrabold text-[#3c4b60]">{signal.label}</p><span className="text-[13px] font-extrabold text-[#28384e]">{signal.value}</span></div><p className="mt-1 text-[10px] text-[#9aa6b7]">{signal.description}</p><div className="mt-2 h-1.5 rounded-full bg-[#edf1f5]"><div className={`h-full rounded-full ${toneClasses[signal.tone]?.line || toneClasses.slate.line}`} style={{ width: `${signal.progress}%` }} /></div></div></div>)}</div><div className="mt-8 rounded-2xl bg-[#f4f7fb] p-4"><p className="text-[10px] font-bold text-[#8491a3]">نرخ حل مسئله</p><p className="mt-1 text-2xl font-extrabold text-[#23344d]">{analytics.resolutionRate ?? 0}٪</p><p className="mt-1 text-[10px] text-[#0e9a84]">محاسبه‌شده از پیام‌ها</p></div></Card></div>;
 }
 
