@@ -1,0 +1,29 @@
+StarCoach 2 Kilo Bananas Hackathon License
+==========================================
+
+Copyright (c) 2026 StarCoach 2 Kilo Bananas
+
+This repository is a three-day Vibe-Coding hackathon prototype created for
+StarCoach. Unless a file or an upstream notice states otherwise, the original
+code written by StarCoach 2 Kilo Bananas is proprietary and source-available
+for evaluation only.
+
+No permission is granted to copy, reproduce, modify, merge, publish,
+distribute, sublicense, sell, deploy, host, or create derivative works from
+the team's code without prior written permission from the team's developers.
+
+Using this code without permission is unauthorized and unethical. Please ask
+the developers for permission before using any part of this repository, even
+when the intended use is educational, commercial, internal, or public.
+
+This prototype was written during a three-day competition sprint and may
+contain bugs, security weaknesses, incomplete features, unsafe defaults,
+unverified integrations, and breaking changes. It is not recommended for
+production use. The developers provide no warranty and accept no liability for
+loss, damage, downtime, data exposure, or other consequences arising from use.
+
+The documentation corpus and other files inherited from
+https://github.com/liara-cloud/docs may be subject to their original
+copyright and license terms. Those upstream rights and obligations remain
+unchanged. This file applies only to the team's original additions to the
+extent that the team is entitled to license them.
