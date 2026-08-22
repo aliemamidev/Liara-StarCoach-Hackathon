@@ -60,6 +60,16 @@ body {
 }
 
 @media (max-width: 767px) {
+  .admin-auth-main {
+    padding-top: max(5rem, calc(env(safe-area-inset-top) + 4.5rem)) !important;
+    padding-bottom: max(1rem, env(safe-area-inset-bottom)) !important;
+  }
+
+  .admin-auth-theme-controls {
+    inset-inline-start: max(1rem, env(safe-area-inset-left) + .5rem);
+    top: max(1rem, env(safe-area-inset-top) + .5rem);
+  }
+
   .admin-auth-shell > div,
   .admin-login-card {
     height: auto;
@@ -276,6 +286,23 @@ html:has(.admin-shell)::-webkit-scrollbar-thumb:hover { background: hsl(var(--ch
 .admin-toggle.is-on span { right: .25rem; }
 .admin-toggle.is-off span { right: 1.5rem; }
 .admin-toggle:focus-visible { outline: 2px solid hsl(var(--site-accent)); outline-offset: 3px; }
+
+@media (max-width: 639px) {
+  .admin-settings-toggle-row {
+    align-items: flex-start;
+    gap: .75rem;
+    padding-block: .875rem;
+  }
+
+  .admin-settings-toggle-row > div {
+    padding-top: .125rem;
+  }
+
+  .admin-settings-toggle-control {
+    flex: 0 0 48px;
+    margin-top: .125rem;
+  }
+}
 
 .admin-conversation-dialog { width: min(680px, calc(100vw - 2rem)); max-height: min(78dvh, 640px); overflow: hidden; border-color: hsl(var(--site-border)); background: hsl(var(--site-surface)); color: hsl(var(--site-text)); padding: 0; }
 .admin-conversation-header { position: sticky; top: 0; z-index: 1; flex-direction: row; align-items: center; justify-content: space-between; gap: 1rem; border-bottom: 1px solid hsl(var(--site-border)); background: hsl(var(--site-surface)); padding: 1rem 1.25rem; }

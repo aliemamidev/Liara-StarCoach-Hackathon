@@ -112,8 +112,9 @@ export function ChatComposer({ value, onChange, files, onFilesChange, onSubmit, 
       return;
     }
     const recognition = new SpeechRecognition();
+    const isMobileBrowser = /Android|iPhone|iPad|iPod/i.test(navigator.userAgent) || (navigator.maxTouchPoints > 1 && /Macintosh/i.test(navigator.userAgent));
     recognition.lang = "fa-IR";
-    recognition.continuous = true;
+    recognition.continuous = !isMobileBrowser;
     recognition.interimResults = true;
     recognition.onstart = () => { setVoiceError(""); updateVoiceState("listening"); startVoiceMeter(); };
     recognition.onresult = (event) => {
@@ -298,4 +299,3 @@ export function ChatComposer({ value, onChange, files, onFilesChange, onSubmit, 
     </div>
   );
 }
-
