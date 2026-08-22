@@ -92,7 +92,7 @@ async function ensureChatOwnership(chatId, owner) {
   await prisma.chat.create({
     data: {
       id: resolvedChatId,
-      title: "گفتگوی جدید",
+      title: "گفت و گو جدید",
       ...(owner.userId ? { userId: owner.userId } : { ownerTokenHash: owner.ownerTokenHash }),
     },
   });
@@ -101,7 +101,7 @@ async function ensureChatOwnership(chatId, owner) {
 
 const ESCALATION_MESSAGE = `## ارسال برای بررسی
 
-برای این سؤال هنوز پاسخ قابل‌اتکایی در منابع موجود پیدا نکردم. درخواستت برای بررسی ادمین ارسال شد؛ پاسخ تأییدشده در همین گفتگو نمایش داده می‌شود.`;
+در سریع‌ترین حالت ممکن، ادمین‌ها به شما پاسخ خواهند داد. ممنون از صبر و شکیبایی شما.`;
 
 const UNANSWERED_MESSAGE = `## پاسخ
 

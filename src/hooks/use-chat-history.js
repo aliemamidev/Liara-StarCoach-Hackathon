@@ -45,7 +45,7 @@ function parseHistory(raw) {
     .filter((chat) => chat?.id && Array.isArray(chat.messages))
     .map((chat) => ({
       ...chat,
-      title: chat.title || textFromMessage(chat.messages.find((message) => message.role === "user")) || "گفتگوی جدید",
+      title: chat.title || textFromMessage(chat.messages.find((message) => message.role === "user")) || "گفت و گو جدید",
       titleGenerated: Boolean(chat.titleGenerated),
     }));
 }
@@ -144,7 +144,7 @@ export function useChatHistory() {
     const existing = currentHistory.find((chat) => chat.id === id);
     const nextChat = {
       id,
-      title: existing?.title || "گفتگوی جدید",
+      title: existing?.title || "گفت و گو جدید",
       titleGenerated: existing?.titleGenerated || false,
       createdAt: existing?.createdAt || now,
       updatedAt: now,

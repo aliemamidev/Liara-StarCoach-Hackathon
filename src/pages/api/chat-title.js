@@ -43,7 +43,7 @@ export default async function handler(req, res) {
       maxOutputTokens: 20,
     });
     const title = cleanTitle(text);
-    return res.status(200).json({ title: title || "گفتگوی جدید" });
+    return res.status(200).json({ title: title || "گفت و گو جدید" });
   } catch {
     return res.status(502).json({ error: "ساخت عنوان گفتگو ممکن نشد." });
   }

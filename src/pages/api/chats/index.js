@@ -21,7 +21,7 @@ function validChat(chat) {
 function cleanChat(chat) {
   return {
     id: String(chat?.id || randomUUID()),
-    title: String(chat?.title || "گفتگوی جدید").slice(0, 60),
+    title: String(chat?.title || "گفت و گو جدید").slice(0, 60),
     titleGenerated: Boolean(chat?.titleGenerated),
     createdAt: Number(chat?.createdAt) || Date.now(),
     updatedAt: Number(chat?.updatedAt) || Date.now(),

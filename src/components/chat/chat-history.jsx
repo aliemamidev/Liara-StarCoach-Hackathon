@@ -14,7 +14,7 @@ export function ChatHistory({ history, activeChatId, onSelect, onNewChat, onDele
 
   function startEditing(chat) {
     setEditingId(chat.id);
-    setDraftTitle(chat.title || "گفتگوی جدید");
+    setDraftTitle(chat.title || "گفت و گو جدید");
   }
 
   function cancelEditing() {
@@ -57,7 +57,7 @@ export function ChatHistory({ history, activeChatId, onSelect, onNewChat, onDele
           <p>گفتگوهای ذخیره‌شده در همین مرورگر</p>
         </div>
         <Button type="button" className="mt-6 w-full justify-start" onClick={onNewChat}>
-          <MessageSquarePlus size={17} aria-hidden="true" /> چت جدید
+          <MessageSquarePlus size={17} aria-hidden="true" /> گفت و گو جدید
         </Button>
         <div id="chat-history-list" className="chat-history-list" aria-label="فهرست گفتگوها">
           {!history.length && <p className="chat-history-empty">هنوز گفتگویی ذخیره نشده است.</p>}
@@ -83,9 +83,9 @@ export function ChatHistory({ history, activeChatId, onSelect, onNewChat, onDele
               ) : (
                 <>
                   <button type="button" className="chat-history-title" data-cuelume-press="press" data-cuelume-release="release" onClick={() => onSelect(chat.id)} title="باز کردن گفتگو">
-                    <span>{chat.title || "گفتگوی جدید"}</span>
+                    <span>{chat.title || "گفت و گو جدید"}</span>
                   </button>
-                  <button type="button" className="chat-history-edit-button" onClick={() => startEditing(chat)} title="ویرایش نام گفتگو" aria-label={`ویرایش ${chat.title || "گفتگوی جدید"}`}>
+                  <button type="button" className="chat-history-edit-button" onClick={() => startEditing(chat)} title="ویرایش نام گفتگو" aria-label={`ویرایش ${chat.title || "گفت و گو جدید"}`}>
                     <Pencil size={13} aria-hidden="true" />
                   </button>
                   <Button type="button" variant="ghost" size="icon" className="h-8 w-8 shrink-0" onClick={() => onDelete(chat.id)} aria-label={`حذف ${chat.title}`}>

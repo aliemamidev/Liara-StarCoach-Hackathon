@@ -245,7 +245,7 @@ export function ChatLayout() {
     <main className="chat-shell" dir="rtl">
       <div className="chat-topbar">
         <ChatHeader
-          title={activeChat?.title || "گفتگوی جدید"}
+          title={activeChat?.title || "گفت و گو جدید"}
           onOpenSettings={() => {
             setSettingsOpen(true);
             sound.playSound("toggle");
