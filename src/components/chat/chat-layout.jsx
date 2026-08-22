@@ -13,7 +13,6 @@ import { ChatSettings } from "@/components/chat/chat-settings";
 
 import { ChatHistory } from "@/components/chat/chat-history";
 import { ScreenshotOverlay } from "@/components/chat/screenshot-overlay";
-import { ScreenshotSourceDialog } from "@/components/chat/screenshot-source-dialog";
 import { useUiSound } from "@/hooks/use-ui-sound";
 import { useChatHistory } from "@/hooks/use-chat-history";
 import { MAX_CHAT_FILES } from "@/lib/chat-message-validation.mjs";
@@ -25,7 +24,6 @@ export function ChatLayout() {
   const [settingsOpen, setSettingsOpen] = useState(false);
 
   const [screenshotOpen, setScreenshotOpen] = useState(false);
-  const [screenshotSourceOpen, setScreenshotSourceOpen] = useState(false);
   const [screenshotError, setScreenshotError] = useState("");
   const sound = useUiSound();
   const chatHistory = useChatHistory();
@@ -175,8 +173,7 @@ export function ChatLayout() {
     setScreenshotError("");
   }
 
-  async function captureDisplayScreenshot(source) {
-    setScreenshotSourceOpen(false);
+  async function captureDisplayScreenshot() {
     if (!navigator.mediaDevices?.getDisplayMedia) {
       setScreenshotOpen(true);
       return;
@@ -184,15 +181,9 @@ export function ChatLayout() {
 
     let stream;
     try {
-      const displaySurface = source === "window" ? "window" : source === "browser" ? "browser" : "monitor";
       stream = await navigator.mediaDevices.getDisplayMedia({
         audio: false,
-        video: { displaySurface },
-        ...(source === "browser" ? {
-          preferCurrentTab: false,
-          selfBrowserSurface: "include",
-          surfaceSwitching: "include",
-        } : {}),
+        video: true,
       });
       const track = stream.getVideoTracks()[0];
       if (!track) throw new Error("screenshot-track-missing");
@@ -200,8 +191,30 @@ export function ChatLayout() {
       const video = document.createElement("video");
       video.srcObject = stream;
       video.muted = true;
-      await video.play();
-      await new Promise((resolve) => requestAnimationFrame(resolve));
+      await new Promise((resolve, reject) => {
+        let settled = false;
+        const finish = () => {
+          if (settled) return;
+          settled = true;
+          video.removeEventListener("loadeddata", finish);
+          video.removeEventListener("error", fail);
+          resolve();
+        };
+        const fail = () => {
+          if (settled) return;
+          settled = true;
+          video.removeEventListener("loadeddata", finish);
+          video.removeEventListener("error", fail);
+          reject(new Error("screenshot-video-load-failed"));
+        };
+        video.addEventListener("loadeddata", finish, { once: true });
+        video.addEventListener("error", fail, { once: true });
+        video.play().then(() => {
+          if (video.readyState >= HTMLMediaElement.HAVE_CURRENT_DATA) finish();
+        }).catch(fail);
+      });
+      if (video.requestVideoFrameCallback) await new Promise((resolve) => video.requestVideoFrameCallback(() => resolve()));
+      else await new Promise((resolve) => requestAnimationFrame(resolve));
       const canvas = document.createElement("canvas");
       canvas.width = settings.width || video.videoWidth;
       canvas.height = settings.height || video.videoHeight;
@@ -221,6 +234,11 @@ export function ChatLayout() {
   function cancelScreenshot(message = "") {
     setScreenshotOpen(false);
     setScreenshotError(message);
+  }
+
+  function openScreenshotCapture() {
+    setScreenshotError("");
+    captureDisplayScreenshot();
   }
 
   return (
@@ -248,7 +266,7 @@ export function ChatLayout() {
             playSound={sound.playSound}
             isLive={liveResponseRef.current}
             scrollContainerRef={messagesViewportRef}
-            onScreenshot={() => { setScreenshotError(""); setScreenshotSourceOpen(true); }}
+            onScreenshot={openScreenshotCapture}
             onContactSubmit={(name, phone) => submitMessage(`نام و نام خانوادگی: ${name}\nشماره تماس: ${phone}`)}
           />
         )}
@@ -266,7 +284,7 @@ export function ChatLayout() {
         files={files}
         onFilesChange={setFiles}
 
-        onScreenshot={() => { setScreenshotError(""); setScreenshotSourceOpen(true); }}
+        onScreenshot={openScreenshotCapture}
         screenshotError={screenshotError}
         onSubmit={() => submitMessage()}
         status={status}
@@ -293,11 +311,6 @@ export function ChatLayout() {
         playSound={sound.playSound}
       />
 
-      <ScreenshotSourceDialog
-        open={screenshotSourceOpen}
-        onOpenChange={setScreenshotSourceOpen}
-        onContinue={captureDisplayScreenshot}
-      />
       {screenshotOpen && <ScreenshotOverlay onCapture={captureScreenshot} onCancel={cancelScreenshot} />}
     </main>
   );

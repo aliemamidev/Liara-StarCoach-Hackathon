@@ -16,6 +16,7 @@ export const LIA_STAGES = Object.freeze({
 
 const QUERY_TOKEN_PATTERN = /[\p{L}\p{N}]+/gu;
 const MIN_SOURCE_CONFIDENCE = 0.6;
+const SOURCE_CONFIDENCE_NOISE = new Set(["صفحه", "مورد", "مشکل", "ارور", "خطا", "کار", "درست", "این", "آن", "همین", "شده", "شد", "است", "هست", "نمی", "نمیشه", "نمی‌شود", "کند", "کنه"]);
 
 export const CLARIFICATION_MESSAGE = `## پرسش تکمیلی
 
@@ -47,6 +48,14 @@ export const PROBABLE_FALLBACK_NOTICE = `## پاسخ احتمالی و غیرم�
 منبع مستقیمی در Documentation پیدا نشد. توضیح زیر یک راهنمای عمومی است و ممکن است با تنظیمات یا سرویس‌های اختصاصی لیارا تفاوت داشته باشد.
 `;
 
+function buildScreenshotRequest(query) {
+  const questions = clarificationQuestions(query).slice(0, 2);
+  const initialQuestions = questions.length
+    ? questions.map((question, index) => `${index + 1}. ${question}`).join("\n")
+    : "1. متن کامل خطا، آخرین تغییر انجام‌شده و نام سرویس یا بخش مربوط را بنویسید.";
+  return `## پرسش اولیه\n\nبرای اینکه از روی اطلاعات موجود مسیر درست را مشخص کنم، ابتدا این موارد را بگویید:\n${initialQuestions}\n\n${SCREENSHOT_MESSAGE}`;
+}
+
 function normalizeText(value) {
   return String(value || "")
     .replace(/[يى]/g, "ی")
@@ -75,7 +84,7 @@ function hitCoverage(hit, queryTokens) {
 }
 
 function sourceConfidence(hit, query) {
-  const queryTokens = documentationQueryTokens(query);
+  const queryTokens = documentationQueryTokens(query).filter((token) => !SOURCE_CONFIDENCE_NOISE.has(token));
   if (!queryTokens.length) return 0;
   return hitCoverage(hit, queryTokens) / queryTokens.length;
 }
@@ -89,7 +98,7 @@ function isStrongEvidence(hits, query) {
 }
 
 function knowledgeConfidence(entry, query) {
-  const queryTokens = [...new Set(tokens(query))];
+  const queryTokens = [...new Set(tokens(query))].filter((token) => !SOURCE_CONFIDENCE_NOISE.has(token));
   if (!queryTokens.length) return 0;
   const haystack = new Set(tokens(`${entry.question || ""} ${entry.answer || ""}`));
   return queryTokens.filter((token) => haystack.has(token)).length / queryTokens.length;
@@ -267,23 +276,9 @@ export async function createLiaControllerPlan(messages, settings = {}) {
 
   const generalTechnical = isGeneralTechnicalQuery(contextQuery);
   const hasImage = hasImageAttachment(messages);
-  if (!understandingComplete(contextQuery) && !generalTechnical) {
-    const visualRequired = needsVisualDiagnosis(`${conversation} ${query}`) && !hasImage;
-    if (visualRequired && priorStage !== LIA_STAGES.SCREENSHOT) {
-      return {
-        mode: LIA_STAGES.SCREENSHOT,
-        stage: LIA_STAGES.SCREENSHOT,
-        query,
-        hits: [],
-        searchTrace: [],
-        classification: "liara_diagnostic",
-        decision: "request_screenshot",
-        reason: "visual_diagnosis_required",
-        sourceConfidence: 0,
-        metadata: { liaAction: "screenshot", screenshotReason: "برای دیدن خطا یا وضعیت صفحه" },
-        message: SCREENSHOT_MESSAGE,
-      };
-    }
+  const visualRequired = needsVisualDiagnosis(`${conversation} ${query}`) && !hasImage;
+  const screenshotFollowup = hasImage && priorStage === LIA_STAGES.SCREENSHOT;
+  if (!understandingComplete(contextQuery) && !generalTechnical && !visualRequired && !screenshotFollowup) {
     return {
       mode: LIA_STAGES.CLARIFICATION,
       stage: LIA_STAGES.CLARIFICATION,
@@ -320,6 +315,11 @@ export async function createLiaControllerPlan(messages, settings = {}) {
       reason: "knowledge_source_confident",
       sourceConfidence: brainConfidence,
       includeSources: !generalTechnical,
+      metadata: visualRequired ? {
+        liaAction: "screenshot",
+        requestScreenshot: true,
+        screenshotReason: "برای تطبیق راهنمای اولیه با وضعیت واقعی صفحه",
+      } : undefined,
     };
   }
   brainHits = [];
@@ -350,6 +350,11 @@ export async function createLiaControllerPlan(messages, settings = {}) {
       reason: "documentation_source_confident",
       sourceConfidence: sourceConfidenceValue,
       includeSources: !generalTechnical,
+      metadata: visualRequired ? {
+        liaAction: "screenshot",
+        requestScreenshot: true,
+        screenshotReason: "برای تطبیق راهنمای اولیه با وضعیت واقعی صفحه",
+      } : undefined,
     };
   }
 
@@ -372,8 +377,30 @@ export async function createLiaControllerPlan(messages, settings = {}) {
         reason: "liara_search_source_confident",
         sourceConfidence: sourceConfidenceValue,
         includeSources: !generalTechnical,
+        metadata: visualRequired ? {
+          liaAction: "screenshot",
+          requestScreenshot: true,
+          screenshotReason: "برای تطبیق راهنمای اولیه با وضعیت واقعی صفحه",
+        } : undefined,
       };
     }
+  }
+
+  if (visualRequired) {
+    return {
+      mode: LIA_STAGES.SCREENSHOT,
+      stage: LIA_STAGES.SCREENSHOT,
+      query,
+      hits,
+      brainHits,
+      searchTrace,
+      classification: "liara_diagnostic",
+      decision: "request_screenshot",
+      reason: "visual_diagnosis_required_after_retrieval",
+      sourceConfidence: Math.max(bestSourceConfidence(hits, retrievalQuery), brainConfidence),
+      metadata: { liaAction: "screenshot", screenshotReason: "برای دیدن خطا یا وضعیت صفحه" },
+      message: buildScreenshotRequest(contextQuery),
+    };
   }
 
   if (generalTechnical) {

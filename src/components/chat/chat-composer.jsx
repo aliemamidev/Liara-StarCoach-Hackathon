@@ -181,6 +181,24 @@ export function ChatComposer({ value, onChange, files, onFilesChange, onSubmit, 
     event.target.value = "";
   }
 
+  function handlePaste(event) {
+    const pastedImages = Array.from(event.clipboardData?.items || [])
+      .filter((item) => item.kind === "file" && item.type.startsWith("image/"))
+      .map((item, index) => {
+        const blob = item.getAsFile();
+        return blob ? new File([blob], `pasted-image-${Date.now()}-${index}.${item.type.split("/")[1] || "png"}`, { type: item.type }) : null;
+      })
+      .filter(Boolean);
+    if (!pastedImages.length) return;
+    event.preventDefault();
+    const available = Math.max(0, MAX_CHAT_FILES - files.length);
+    const valid = pastedImages.filter(validateSelectedFile);
+    if (valid.length > available) setFileError("حداکثر ۴ فایل را می‌توانید هم‌زمان ارسال کنید.");
+    else if (valid.length !== pastedImages.length) setFileError("تصویر Clipboard معتبر نیست یا حجم آن بیشتر از ۴ مگابایت است.");
+    else setFileError("");
+    if (valid.length && available > 0) onFilesChange([...files, ...valid.slice(0, available)]);
+  }
+
   return (
     <div className="chat-composer-wrap">
       <div className={`chat-composer${voiceState === "listening" ? " is-listening" : ""}${voiceState === "stopping" ? " is-stopping" : ""}`}>
@@ -217,6 +235,7 @@ export function ChatComposer({ value, onChange, files, onFilesChange, onSubmit, 
                 ref={textareaRef}
                 value={value}
                 onChange={(event) => onChange(event.target.value)}
+                onPaste={handlePaste}
                 onKeyDown={handleKeyDown}
                 placeholder="پیام خود را بنویسید..."
                 aria-label="پیام خود را بنویسید"
@@ -279,5 +298,4 @@ export function ChatComposer({ value, onChange, files, onFilesChange, onSubmit, 
     </div>
   );
 }
-
 
