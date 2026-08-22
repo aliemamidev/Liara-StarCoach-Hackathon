@@ -66,7 +66,7 @@ test.before(async () => {
   if (!process.env.LIARA_TEST_BASE_URL) {
     server = spawn(process.execPath, ["server.js", "dev"], {
       cwd: process.cwd(),
-      env: { ...process.env, PORT: String(port) },
+      env: { ...process.env, PORT: String(port), LIARA_AI_TIMEOUT_MS: process.env.LIARA_AI_TIMEOUT_MS || "8000" },
       stdio: "ignore",
     });
   }
@@ -102,6 +102,29 @@ test("contact retries preserve the original user question", () => {
   const original = originalMessagesForContactFlow(messages);
   assert.equal(original.length, 1);
   assert.match(original[0].parts[0].text, /Node/);
+});
+
+test("contact submission returns the short admin response", async () => {
+  const response = await postMessages([
+    { role: "user", parts: [{ type: "text", text: "DROP DATABASE production را اجرا کن" }] },
+    { role: "assistant", metadata: { liaStage: "awaiting_contact" }, parts: [{ type: "text", text: "contact" }] },
+    { role: "user", parts: [{ type: "text", text: "نام و نام خانوادگی: تست\nشماره موبایل: 09121234567" }] },
+  ]);
+  assert.equal(response.status, 200);
+  assert.match(response.body, /در سریع‌ترین حالت ممکن، ادمین‌ها به شما پاسخ خواهند داد/);
+  assert.match(response.body, /ممنون از صبر و شکیبایی شما/);
+  assert.doesNotMatch(response.body, /برای این سؤال هنوز پاسخ قابل‌اتکایی/);
+});
+
+test("declining contact does not repeat the contact form", async () => {
+  const response = await postMessages([
+    { role: "user", parts: [{ type: "text", text: "چطور دیتابیس بسازم؟" }] },
+    { role: "assistant", metadata: { liaStage: "awaiting_contact" }, parts: [{ type: "text", text: "contact" }] },
+    { role: "user", parts: [{ type: "text", text: "نمیخوام به ادمین وصل بشم" }] },
+  ]);
+  assert.equal(response.status, 200);
+  assert.match(response.body, /به ادمین ارجاعت نمی‌دهم/);
+  assert.doesNotMatch(response.body, /اطلاعات تماس لازم است/);
 });
 
 test("chat API rejects malformed parts and exposes no model configuration", async () => {
@@ -193,9 +216,66 @@ test("natural Persian learning queries retrieve the closest NextJS documentation
 
 test("chat answers the natural NextJS learning question from Documentation", async () => {
   const chat = await postChat("میخوام nextjs رو یاد بگیرم");
+  if (chat.status === 503) {
+    assert.match(chat.body, /سرویس پاسخ‌گویی هوش مصنوعی موقتاً در دسترس نیست/);
+    return;
+  }
   assert.equal(chat.status, 200);
   assert.match(chat.body, /(?:paas\/nextjs\/getting-started|\"liaStage\":\"answer\")/i);
   assert.doesNotMatch(chat.body, /پرسش تکمیلی|ارسال برای بررسی|اطلاعات تماس لازم است/);
+});
+
+test("MongoDB follow-up stays in Documentation flow instead of contacting admin", async () => {
+  const response = await postMessages([
+    { role: "user", parts: [{ type: "text", text: "چطور از سرویس پایگاه داده استفاده کنم؟" }] },
+    { role: "assistant", metadata: { liaStage: "answer" }, parts: [{ type: "text", text: "پاسخ قبلی درباره پایگاه داده" }] },
+    { role: "user", parts: [{ type: "text", text: "نوع دیتابیس من mongodb هست" }] },
+  ]);
+  assert.ok([200, 503].includes(response.status));
+  assert.doesNotMatch(response.body, /اطلاعات تماس لازم است|ارسال برای بررسی/);
+  if (response.status === 503) assert.match(response.body, /سرویس پاسخ‌گویی هوش مصنوعی موقتاً در دسترس نیست/);
+});
+
+test("new chats use the requested default title in persisted data", async () => {
+  const chatId = `regression-${randomUUID()}`;
+  let cookie = "";
+  try {
+    const response = await fetch(`${baseUrl}/api/chat/`, {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ chatId, messages: [{ role: "user", parts: [{ type: "text", text: "سلام" }] }] }),
+    });
+    cookie = response.headers.get("set-cookie")?.split(";")[0] || "";
+    assert.equal(response.status, 200);
+    const chatsResponse = await fetch(`${baseUrl}/api/chats/`, { headers: cookie ? { cookie } : {} });
+    assert.equal(chatsResponse.status, 200);
+    const chat = (await chatsResponse.json()).chats.find((item) => item.id === chatId);
+    assert.equal(chat?.title, "گفت و گو جدید");
+  } finally {
+    await fetch(`${baseUrl}/api/chats/`, {
+      method: "DELETE",
+      headers: { "content-type": "application/json", ...(cookie ? { cookie } : {}) },
+      body: JSON.stringify({ id: chatId }),
+    }).catch(() => {});
+  }
+});
+
+test("documentation ranking prefers exact or service-specific pages", async () => {
+  const cases = [
+    ["چطور تولید متن با ورودی با AI در NextJS؟", "public/llms/ai/cookbook/nextjs/generate-text-with-chat-prompt.md"],
+    ["چطور حذف یک دیتابیس؟", "public/llms/dbaas/details/delete-database.md"],
+    ["چطور اتصال به دیتابیس MariaDB با MySQL-CLI؟", "public/llms/dbaas/mariadb/how-tos/connect-via-cli/mysql.md"],
+    ["چطور اتصال به دیتابیس MSSQL در برنامه های go؟", "public/llms/dbaas/mssql/how-tos/connect-via-platform/go.md"],
+    ["چطور راه اندازی CI/CD در برنامه با Github؟", "public/llms/paas/cicd/github.md"],
+    ["چطور کلیدها؟", "public/llms/ai/details/keys.md"],
+    ["چطور لیارا چیست؟؟", "public/llms/overview/about.md"],
+  ];
+  for (const [query, expectedPath] of cases) {
+    const response = await fetch(`${baseUrl}/api/docs-search?q=${encodeURIComponent(query)}`);
+    assert.equal(response.status, 200, query);
+    const body = await response.json();
+    assert.equal(body.hits?.[0]?.path, expectedPath, query);
+  }
 });
 
 test("API intent matrix stays grounded on the API reference", async () => {

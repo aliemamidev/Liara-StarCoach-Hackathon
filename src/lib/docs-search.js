@@ -34,6 +34,7 @@ let documentsPromise;
 let documentationVocabularyPromise;
 let onlineClient;
 let prismaPromise;
+let indexedDocumentsCountPromise;
 
 async function getPrisma() {
   if (!process.env.DATABASE_URL) return null;
@@ -104,6 +105,7 @@ function queryTokens(value) {
 
 function matchesToken(token, values) {
   const valueSet = values instanceof Set ? values : new Set(values);
+  if (valueSet.has(token)) return true;
   return tokenVariants(token).some((variant) => valueSet.has(variant));
 }
 
@@ -256,16 +258,20 @@ export async function loadDocuments() {
 function searchableDocument(document) {
   return {
     ...document,
-    titleTokens: tokens(document.title),
-    sectionTokens: tokens(document.section),
-    bodyTokens: new Set(tokens(document.body)),
-    pathTokens: tokens(document.path),
+    titleTokens: document.titleTokens || tokens(document.title),
+    sectionTokens: document.sectionTokens || tokens(document.section),
+    bodyTokens: document.bodyTokens || new Set(tokens(document.body)),
+    pathTokens: document.pathTokens || tokens(document.path),
     ...documentationMetadata(document.path),
   };
 }
 
 function scoreDocument(document, query, queryTokens) {
   const normalizedQuery = normalizeText(query).toLocaleLowerCase("fa");
+  const normalizedTitle = normalizeSearchQuery(document.title).toLocaleLowerCase("fa");
+  const normalizedComparableQuery = normalizeSearchQuery(query).toLocaleLowerCase("fa");
+  const titleQueryTokens = queryTokensForSearch(document.title);
+  const querySearchTokens = queryTokensForSearch(query);
   const searchableTokens = new Set([
     ...document.titleTokens,
     ...document.sectionTokens,
@@ -284,8 +290,13 @@ function scoreDocument(document, query, queryTokens) {
   if (normalizedQuery.length > 3 && document.title.toLocaleLowerCase("fa").includes(normalizedQuery)) score += 4;
   if (normalizedQuery.length > 3 && document.section.toLocaleLowerCase("fa").includes(normalizedQuery)) score += 2.5;
   if (normalizedQuery.length > 5 && document.body.toLocaleLowerCase("fa").includes(normalizedQuery)) score += 2;
+  if (normalizedTitle === normalizedComparableQuery) score += 14;
+  if (titleQueryTokens.length >= 2 && titleQueryTokens.every((token) => matchesToken(token, new Set(querySearchTokens)) && querySearchTokens.length <= titleQueryTokens.length + 2)) score += 10;
   score += titleMatches * 2.2 + sectionMatches * 1.6 + pathMatches;
   score += metadataMatches * 2.4;
+  if (queryTokens.length >= 2 && titleMatches >= Math.ceil(queryTokens.length * 0.75)) score += 18;
+  if (queryTokens.length >= 2 && titleMatches === queryTokens.length) score += 60;
+  if (queryTokens.length === 1 && titleMatches === 1) score += 60;
   if (document.category === "references" && document.documentType === "about") score += 4;
   if (LEARNING_QUERY_PATTERN.test(query)) {
     score += ({
@@ -310,12 +321,7 @@ function rankDocuments(documents, query) {
     .sort((a, b) => b.score - a.score);
   const bestScore = ranked[0]?.score || 0;
   const relevanceFloor = queryTokens.some((token) => TECHNICAL_TERM_PATTERN.test(token)) ? 0.8 : 0.45;
-  const ordered = LEARNING_QUERY_PATTERN.test(query)
-    ? [
-      ...ranked.filter((item) => LEARNING_DOCUMENT_TYPES.has(item.document.documentType)),
-      ...ranked.filter((item) => !LEARNING_DOCUMENT_TYPES.has(item.document.documentType)),
-    ]
-    : ranked;
+  const ordered = ranked;
   const selected = [];
   const seenSections = new Set();
   for (const item of ordered) {
@@ -344,15 +350,16 @@ function documentationDomainBoost(relativePath, query) {
   }
   const databaseTechnology = [
     [/(?:postgre\s*sql|postgres(?:ql)?|پستگرس)/iu, "/postgresql/"],
-    [/(?:my\s*sql|mysql|مای.?اس.?کیو.?ال)/iu, "/mysql/"],
     [/(?:maria\s*db|mariadb|ماریا)/iu, "/mariadb/"],
+    [/(?:my\s*sql|mysql|مای.?اس.?کیو.?ال)/iu, "/mysql/"],
     [/(?:mongo\s*db|mongodb|mongo|مانگو)/iu, "/mongodb/"],
     [/(?:redis|ردیس)/iu, "/redis/"],
     [/(?:rabbit\s*mq|rabbitmq)/iu, "/rabbitmq/"],
     [/(?:elastic\s*search|elasticsearch)/iu, "/elastic-search/"],
     [/(?:mssql|sql\s*server)/iu, "/mssql/"],
   ].find(([pattern]) => pattern.test(query));
-  if (databaseTechnology?.[1] && normalizedPath.includes(databaseTechnology[1])) boost += 8;
+  if (databaseTechnology?.[1] && normalizedPath.includes(databaseTechnology[1])) boost += 22;
+  if (databaseTechnology?.[1] && normalizedPath.includes("/dbaas/") && !normalizedPath.includes(databaseTechnology[1])) boost -= 4;
   if (/(?:\bnode(?:\.js)?\b|نود)/iu.test(query)) {
     if (normalizedPath.includes("/nodejs/")) boost += 5;
     else if (normalizedPath.includes("/docker/")) boost -= 1;
@@ -361,6 +368,13 @@ function documentationDomainBoost(relativePath, query) {
     if (normalizedPath.includes("/nextjs/")) boost += 5;
     else if (normalizedPath.includes("/nodejs/")) boost -= 1;
   }
+  if (/\bapi\b/iu.test(query) && !/(?:سرور\s+مجازی|ماشین\s+مجازی|iaas|ابر)/iu.test(query)) {
+    if (normalizedPath.includes("/references/api/about.md")) boost += 128;
+    else if (normalizedPath.includes("/references/api/")) boost += 100;
+    else if (normalizedPath.includes("/iaas/api/")) boost -= 30;
+  }
+  if (/(?:لیارا|liara)/iu.test(query) && /چیست|درباره|معرفی/iu.test(query) && normalizedPath.includes("/overview/about.md")) boost += 80;
+  if (/(?:متغیر(?:های)?\s+محیطی|environment\s+variables?|\benv\b)/iu.test(query) && normalizedPath.includes("/paas/details/envs.md")) boost += 24;
   if (!DATABASE_QUERY_PATTERN.test(query)) return boost;
   if (normalizedPath.includes("/dbaas/")) return boost + 2.5;
   if (normalizedPath.includes("/references/cli/") && normalizedPath.includes("db")) return boost + 1.75;
@@ -415,26 +429,29 @@ function expandQuery(query) {
 
 export async function searchDocumentation(query) {
   if (!query?.trim()) return { available: true, hits: [] };
+  let databaseHits = [];
+  let databaseAvailable = false;
   try {
-    const databaseHits = await searchDocumentationDatabase(query);
-    const rankedDatabaseHits = databaseHits?.length ? rankDocuments(databaseHits, query) : [];
-    if (rankedDatabaseHits.length) return { available: true, hits: rankedDatabaseHits };
+    const result = await searchDocumentationDatabase(query);
+    databaseHits = result || [];
+    databaseAvailable = result !== null;
   } catch {
     // A not-yet-migrated database should not make the chat unusable.
   }
   try {
     documentsPromise ||= loadDocuments();
     const documents = await documentsPromise;
-    return { available: true, hits: rankDocuments(documents, query) };
+    return { available: true, hits: rankDocuments([...databaseHits, ...documents], query) };
   } catch {
-    return { available: false, hits: [] };
+    return { available: databaseAvailable, hits: rankDocuments(databaseHits, query) };
   }
 }
 
 async function searchDocumentationDatabase(query) {
   const prisma = await getPrisma();
   if (!prisma) return null;
-  const indexedDocuments = await prisma.knowledgeDocument.count({ where: { isActive: true } });
+  indexedDocumentsCountPromise ||= prisma.knowledgeDocument.count({ where: { isActive: true } });
+  const indexedDocuments = await indexedDocumentsCountPromise;
   if (!indexedDocuments) return null;
   const expandedQuery = expandQuery(query);
   const salientTerms = [...new Set(queryTokensForSearch(query).map((term) => term.replace(/[^\p{L}\p{N}_]/gu, "")))].filter(Boolean);
