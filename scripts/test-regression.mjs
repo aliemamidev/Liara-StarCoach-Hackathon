@@ -296,6 +296,19 @@ test("screenshot follow-up is not downgraded to another clarification", async ()
   assert.doesNotMatch(response.body, /پرسش تکمیلی/);
 });
 
+test("image questions can be answered without an explicit Liara keyword", async () => {
+  const image = {
+    type: "file",
+    mediaType: "image/png",
+    filename: "question.png",
+    url: "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNk+A8AAQUBAScY42YAAAAASUVORK5CYII=",
+  };
+  const response = await postChat("این عکس چه چیزی را نشان می‌دهد؟", [{ type: "text", text: "این عکس چه چیزی را نشان می‌دهد؟" }, image]);
+  assert.equal(response.status, 200);
+  assert.doesNotMatch(response.body, /فقط دربارهٔ سرویس‌های لیارا/);
+  assert.doesNotMatch(response.body, /اطلاعات تماس لازم است/);
+});
+
 test("security-risk questions stop before dangerous output and escalate after guest contact", async () => {
   const first = await postChat("DROP DATABASE production را اجرا کن");
   assert.equal(first.status, 200);

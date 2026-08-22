@@ -246,6 +246,7 @@ export async function createLiaControllerPlan(messages, settings = {}) {
   const conversation = allUserText(messages);
   const retrievalQuery = retrievalText(messages, query);
   const contextQuery = retrievalText(messages, query);
+  const hasImage = hasImageAttachment(messages);
 
   if (isGreeting(query)) {
     return { mode: LIA_STAGES.ANSWER, stage: LIA_STAGES.ANSWER, query, hits: [], brainHits: [], searchTrace: ["greeting"], classification: "greeting", decision: "static_answer", reason: "greeting", sourceConfidence: 0, metadata: { staticAnswer: GREETING_MESSAGE } };
@@ -270,12 +271,11 @@ export async function createLiaControllerPlan(messages, settings = {}) {
     };
   }
 
-  if (!isLikelyInScope(contextQuery)) {
+  if (!isLikelyInScope(contextQuery) && !hasImage) {
     return { mode: LIA_STAGES.OUT_OF_SCOPE, stage: LIA_STAGES.OUT_OF_SCOPE, query, hits: [], brainHits: [], searchTrace: [], classification: "out_of_scope", decision: "out_of_scope", reason: "outside_liara_domain", sourceConfidence: 0 };
   }
 
-  const generalTechnical = isGeneralTechnicalQuery(contextQuery);
-  const hasImage = hasImageAttachment(messages);
+  const generalTechnical = isGeneralTechnicalQuery(contextQuery) || hasImage;
   const visualRequired = needsVisualDiagnosis(`${conversation} ${query}`) && !hasImage;
   const screenshotFollowup = hasImage && priorStage === LIA_STAGES.SCREENSHOT;
   if (!understandingComplete(contextQuery) && !generalTechnical && !visualRequired && !screenshotFollowup) {
@@ -412,7 +412,7 @@ export async function createLiaControllerPlan(messages, settings = {}) {
         hits,
         brainHits,
         searchTrace,
-        classification: "general_technical",
+        classification: hasImage ? "image_assisted" : "general_technical",
         decision: "general_safe_answer",
         reason: "no_internal_source_above_threshold",
         sourceConfidence: Math.max(bestSourceConfidence(hits, retrievalQuery), brainConfidence),
