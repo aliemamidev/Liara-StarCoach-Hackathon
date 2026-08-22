@@ -11,7 +11,18 @@ const DOCUMENTATION_ROOTS = ["public/llms"];
 const ONLINE_INDEX = "docs";
 const DATABASE_QUERY_PATTERN = /(?:دیتابیس|پایگاه\s+داده|database|postgres(?:ql)?|mysql|mariadb|mongodb|mongo|redis|rabbitmq|elasticsearch|elastic\s*search|mssql|sql\s*server|sqlite|بکاپ|backup|بازیابی|restore|connection\s*pool|اتصال\s+به\s+(?:دیتابیس|پایگاه))/iu;
 const SEARCH_STOP_WORDS = new Set(["به", "در", "برای", "با", "از", "و", "را", "یک", "این", "آن", "برنامه", "روش", "است", "های", "کردن"]);
-const QUERY_NOISE_WORDS = new Set(["چطور", "چطوری", "چگونه", "نحوه", "میخوام", "می", "خوام", "بگیرم", "گرفتن", "دریافت", "استفاده", "کنم", "کنیم", "میشه", "شود", "کنه", "کند", "چیست", "چیه", "یعنی", "مستندات", "راهنما", "کجا", "کار", "رو", "بیارم", "بسازم", "بساز", "ساختن"]);
+const QUERY_NOISE_WORDS = new Set(["چطور", "چطوری", "چگونه", "نحوه", "میخوام", "می", "خوام", "خواهم", "بگیرم", "گرفتن", "دریافت", "استفاده", "کنم", "کنیم", "میشه", "شود", "کنه", "کند", "چیست", "چیه", "یعنی", "مستندات", "راهنما", "راهنمایی", "کجا", "کار", "رو", "بیارم", "بسازم", "بساز", "ساختن", "یاد", "یادگیری", "یادبگیرم", "یادگرفتن", "آموزش", "آموزشی", "دوره", "شروع", "مسیر"]);
+const SEARCH_ALIAS_REPLACEMENTS = [
+  [/\bnext\s*(?:[._-]\s*)?js\b/giu, "nextjs"],
+  [/\bnode\s*(?:[._-]\s*)?js\b/giu, "nodejs"],
+  [/\bnest\s*(?:[._-]\s*)?js\b/giu, "nestjs"],
+  [/\bpostgre\s*sql\b/giu, "postgresql"],
+  [/\bmongo\s*db\b/giu, "mongodb"],
+  [/\btype\s*script\b/giu, "typescript"],
+  [/\bjava\s*script\b/giu, "javascript"],
+];
+const LEARNING_QUERY_PATTERN = /(?:یاد\s*(?:بگیرم|بگیری|گرفتن)?|یادگیری|آموزش|آموزشی|دوره|مسیر|شروع\s+به\s+کار|getting\s*started|learn|learning|tutorial)/iu;
+const LEARNING_DOCUMENT_TYPES = new Set(["getting-started", "quick-start", "create-app", "deploy-app"]);
 const DOCUMENTATION_HOST_PATTERN = /(?:^|\.)liara\.ir$/i;
 let documentsPromise;
 let onlineClient;
@@ -32,8 +43,12 @@ export function normalizeText(value) {
     .trim();
 }
 
+function normalizeSearchQuery(value) {
+  return SEARCH_ALIAS_REPLACEMENTS.reduce((result, [pattern, replacement]) => result.replace(pattern, replacement), normalizeText(value));
+}
+
 function tokens(value) {
-  return (normalizeText(value).toLocaleLowerCase("fa").match(/[\p{L}\p{N}]+(?:[._-][\p{L}\p{N}]+)*/gu) || [])
+  return (normalizeSearchQuery(value).toLocaleLowerCase("fa").match(/[\p{L}\p{N}]+(?:[._-][\p{L}\p{N}]+)*/gu) || [])
     .filter((token) => !SEARCH_STOP_WORDS.has(token));
 }
 
@@ -252,6 +267,15 @@ function scoreDocument(document, query, queryTokens) {
   score += titleMatches * 2.2 + sectionMatches * 1.6 + pathMatches;
   score += metadataMatches * 2.4;
   if (document.category === "references" && document.documentType === "about") score += 4;
+  if (LEARNING_QUERY_PATTERN.test(query)) {
+    score += ({
+      "getting-started": 6,
+      "quick-start": 4,
+      "create-app": 3,
+      "deploy-app": 2,
+      "related-links": 1,
+    }[document.documentType] || 0);
+  }
   score += documentationDomainBoost(document.path, query);
   score += Number(document.dbScore || 0) * 0.35;
   return { document, score, coverage: matchingTokens.length, structuralMatches };
@@ -269,9 +293,15 @@ function rankDocuments(documents, query) {
     .filter(({ coverage, structuralMatches }) => coverage >= minimumCoverage && (structuralMatches > 0 || coverage >= 2))
     .sort((a, b) => b.score - a.score);
   const bestScore = ranked[0]?.score || 0;
+  const ordered = LEARNING_QUERY_PATTERN.test(query)
+    ? [
+      ...ranked.filter((item) => LEARNING_DOCUMENT_TYPES.has(item.document.documentType)),
+      ...ranked.filter((item) => !LEARNING_DOCUMENT_TYPES.has(item.document.documentType)),
+    ]
+    : ranked;
   const selected = [];
   const seenSections = new Set();
-  for (const item of ranked) {
+  for (const item of ordered) {
     const sectionKey = `${item.document.url || item.document.path}|${item.document.section}`;
     if (item.score < bestScore * 0.45 || seenSections.has(sectionKey)) continue;
     selected.push(item);
@@ -296,6 +326,10 @@ function documentationDomainBoost(relativePath, query) {
     if (normalizedPath.includes("/nodejs/")) boost += 5;
     else if (normalizedPath.includes("/docker/")) boost -= 1;
   }
+  if (queryTokensForSearch(query).includes("nextjs")) {
+    if (normalizedPath.includes("/nextjs/")) boost += 5;
+    else if (normalizedPath.includes("/nodejs/")) boost -= 1;
+  }
   if (!DATABASE_QUERY_PATTERN.test(query)) return boost;
   if (normalizedPath.includes("/dbaas/")) return boost + 2.5;
   if (normalizedPath.includes("/references/cli/") && normalizedPath.includes("db")) return boost + 1.75;
@@ -309,6 +343,10 @@ const TECHNICAL_TERM_PATTERN = /^(?:api|api-key|cli|docker|redis|postgres|postgr
 function queryTokensForSearch(value) {
   const salient = queryTokens(value);
   return salient.length ? salient : [...new Set(tokens(value))];
+}
+
+export function documentationQueryTokens(value) {
+  return queryTokensForSearch(value);
 }
 
 function expandQuery(query) {
@@ -394,7 +432,7 @@ async function searchDocumentationDatabase(query) {
     SELECT *
     FROM matched_chunks
     WHERE "documentRank" <= 2
-      AND "serviceRank" <= 8
+      AND "serviceRank" <= ${LEARNING_QUERY_PATTERN.test(query) ? 20 : 8}
     ORDER BY "dbScore" DESC, "path" ASC
     LIMIT ${MAX_RESULTS * 20}
   `;

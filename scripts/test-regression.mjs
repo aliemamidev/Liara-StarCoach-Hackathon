@@ -142,6 +142,31 @@ test("local docs search returns more than one precise source when needed", async
   assert.ok(hits.every((hit) => /^https:\/\/docs\.liara\.ir\//.test(hit.url)));
 });
 
+test("natural Persian learning queries retrieve the closest NextJS documentation", async () => {
+  const queries = [
+    "nextjs",
+    "next.js",
+    "یادگیری NextJS",
+    "میخوام nextjs رو یاد بگیرم",
+    "چطور Next.js در لیارا deploy کنم؟",
+  ];
+  for (const query of queries) {
+    const response = await fetch(`${baseUrl}/api/docs-search/?q=${encodeURIComponent(query)}`);
+    assert.equal(response.status, 200, query);
+    const hits = (await response.json()).hits || [];
+    assert.ok(hits.length > 0, query);
+    assert.match(hits[0].path, /(?:paas\/nextjs|ai\/getting-started\/nextjs)/i, query);
+    assert.ok(hits.every((hit) => /^https:\/\/docs\.liara\.ir\//.test(hit.url)), query);
+  }
+});
+
+test("chat answers the natural NextJS learning question from Documentation", async () => {
+  const chat = await postChat("میخوام nextjs رو یاد بگیرم");
+  assert.equal(chat.status, 200);
+  assert.match(chat.body, /(?:paas\/nextjs\/getting-started|\"liaStage\":\"answer\")/i);
+  assert.doesNotMatch(chat.body, /پرسش تکمیلی|ارسال برای بررسی|اطلاعات تماس لازم است/);
+});
+
 test("API intent matrix stays grounded on the API reference", async () => {
   const queries = [
     "api",
