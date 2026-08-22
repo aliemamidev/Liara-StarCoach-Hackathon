@@ -12,6 +12,7 @@
     "sitemap": "node sitemap/generate.js",
     "fetch:models": "node src/scripts/fetch-liara-ai-models.js",
     "test:regression": "node --test scripts/test-regression.mjs",
+    "test:rag": "node scripts/evaluate-rag.mjs",
     "prepare": "npx husky install || echo husky skipped",
     "db:generate": "prisma generate",
     "db:migrate": "prisma migrate dev",

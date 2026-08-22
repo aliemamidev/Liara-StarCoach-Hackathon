@@ -50,6 +50,11 @@ function sourceMetadata(plan) {
   };
 }
 
+function logDevelopmentTrace(plan) {
+  if (process.env.NODE_ENV === "production" || !plan.debugTrace) return;
+  console.info(`[lia.trace] ${JSON.stringify(plan.debugTrace)}`);
+}
+
 function modelMessages(messages) {
   return messages.filter((message) => message.role !== "system");
 }
@@ -139,9 +144,11 @@ export default async function handler(req, res) {
       if (!contact) return await pipeContactRequest(res, messages);
       const originalMessages = originalMessagesForContactFlow(messages);
       const originalPlan = await createLiaControllerPlan(originalMessages, settings);
+      logDevelopmentTrace(originalPlan);
       return await pipeEscalation(res, messages, chatId, originalPlan, contact);
     }
     const plan = await createLiaControllerPlan(messages, settings);
+    logDevelopmentTrace(plan);
     if (plan.metadata?.staticAnswer) return await pipeStaticMessage(res, messages, plan.metadata.staticAnswer, LIA_STAGES.ANSWER, plan.metadata);
     if (plan.mode === LIA_STAGES.OUT_OF_SCOPE) return await pipeStaticMessage(res, messages, OUT_OF_SCOPE_MESSAGE, plan.stage);
     if (plan.mode === LIA_STAGES.CLARIFICATION || plan.mode === LIA_STAGES.SCREENSHOT) {

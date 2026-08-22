@@ -146,7 +146,9 @@ function documentationMetadata(sourcePath) {
   const llmsIndex = parts.indexOf("llms");
   const relativeParts = llmsIndex >= 0 ? parts.slice(llmsIndex + 1) : parts;
   const category = relativeParts[0] || null;
-  const service = relativeParts[1] || category || null;
+  const service = relativeParts[1] && !/\.(?:md|mdx|html?)$/i.test(relativeParts[1])
+    ? relativeParts[1]
+    : category || null;
   const documentType = relativeParts.at(-1)?.replace(/\.(?:md|mdx|html?)$/i, "") || null;
   return { category, service, documentType };
 }
@@ -253,7 +255,14 @@ function searchableDocument(document) {
 
 function scoreDocument(document, query, queryTokens) {
   const normalizedQuery = normalizeText(query).toLocaleLowerCase("fa");
-  const matchingTokens = queryTokens.filter((token) => matchesToken(token, document.bodyTokens));
+  const searchableTokens = new Set([
+    ...document.titleTokens,
+    ...document.sectionTokens,
+    ...document.pathTokens,
+    ...document.bodyTokens,
+    ...tokens(`${document.category || ""} ${document.service || ""} ${document.documentType || ""}`),
+  ]);
+  const matchingTokens = queryTokens.filter((token) => matchesToken(token, searchableTokens));
   const titleMatches = queryTokens.filter((token) => matchesToken(token, document.titleTokens)).length;
   const sectionMatches = queryTokens.filter((token) => matchesToken(token, document.sectionTokens)).length;
   const pathMatches = queryTokens.filter((token) => matchesToken(token, document.pathTokens)).length;
@@ -289,6 +298,7 @@ function rankDocuments(documents, query) {
     .filter(({ coverage, structuralMatches }) => coverage >= minimumCoverage && (structuralMatches > 0 || coverage >= 2))
     .sort((a, b) => b.score - a.score);
   const bestScore = ranked[0]?.score || 0;
+  const relevanceFloor = queryTokens.some((token) => TECHNICAL_TERM_PATTERN.test(token)) ? 0.8 : 0.45;
   const ordered = LEARNING_QUERY_PATTERN.test(query)
     ? [
       ...ranked.filter((item) => LEARNING_DOCUMENT_TYPES.has(item.document.documentType)),
@@ -299,7 +309,7 @@ function rankDocuments(documents, query) {
   const seenSections = new Set();
   for (const item of ordered) {
     const sectionKey = `${item.document.url || item.document.path}|${item.document.section}`;
-    if (item.score < bestScore * 0.45 || seenSections.has(sectionKey)) continue;
+    if (item.score < bestScore * relevanceFloor || seenSections.has(sectionKey)) continue;
     selected.push(item);
     seenSections.add(sectionKey);
     if (selected.length >= MAX_RESULTS) break;
@@ -315,6 +325,8 @@ function rankDocuments(documents, query) {
 function documentationDomainBoost(relativePath, query) {
   const normalizedPath = String(relativePath || "").replaceAll("\\", "/").toLowerCase();
   let boost = 0;
+  const referenceTerm = queryTokensForSearch(query).find((token) => TECHNICAL_TERM_PATTERN.test(token));
+  if (referenceTerm && normalizedPath.includes(`/references/${referenceTerm}/`)) boost += 6;
   if (/(?:\bssh\b|shell|سرور|دسترسی\s+به\s+سرور)/iu.test(query)) {
     if (normalizedPath.includes("/iaas/")) boost += 7;
     else if (normalizedPath.includes("/dbaas/")) boost -= 3;
@@ -384,7 +396,15 @@ async function searchDocumentationDatabase(query) {
   const indexedDocuments = await prisma.knowledgeDocument.count({ where: { isActive: true } });
   if (!indexedDocuments) return null;
   const expandedQuery = expandQuery(query);
-  const tsQuery = [...new Set(tokens(expandedQuery).map((term) => term.replace(/[^\p{L}\p{N}_]/gu, "")))].filter(Boolean).join(" | ");
+  const salientTerms = [...new Set(queryTokensForSearch(query).map((term) => term.replace(/[^\p{L}\p{N}_]/gu, "")))].filter(Boolean);
+  const expandedTerms = [...new Set(tokens(expandedQuery).map((term) => term.replace(/[^\p{L}\p{N}_]/gu, "")))].filter(Boolean);
+  const focusedTerms = salientTerms.filter((term) => /[a-z\d]/iu.test(term));
+  const tsQuery = focusedTerms.length >= 2
+    ? focusedTerms.join(" & ")
+    : focusedTerms.length === 1
+      ? expandedTerms.join(" | ")
+      : expandedTerms.join(" | ");
+  const titlePattern = normalizeText(query);
   if (!tsQuery) return [];
   const rows = await prisma.$queryRaw`
     WITH matched_chunks AS (
@@ -432,13 +452,15 @@ async function searchDocumentationDatabase(query) {
       INNER JOIN "KnowledgeDocument" d ON d."id" = c."documentId"
       WHERE c."isActive" = true
         AND d."isActive" = true
-        AND to_tsvector('simple', c."normalizedText") @@ to_tsquery('simple', ${tsQuery})
+        AND (
+          to_tsvector('simple', c."normalizedText") @@ to_tsquery('simple', ${tsQuery})
+          OR d."title" = ${titlePattern}
+        )
     )
     SELECT *
     FROM matched_chunks
     WHERE "documentRank" <= 2
-      AND "serviceRank" <= ${LEARNING_QUERY_PATTERN.test(query) ? 20 : 8}
-    ORDER BY "dbScore" DESC, "path" ASC
+    ORDER BY CASE WHEN "title" = ${titlePattern} THEN 1 ELSE 0 END DESC, "dbScore" DESC, "path" ASC
     LIMIT ${MAX_RESULTS * 20}
   `;
   return rows.map((row) => ({ ...row, dbScore: Number(row.dbScore || 0) }));

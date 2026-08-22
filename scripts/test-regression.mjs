@@ -142,6 +142,18 @@ test("local docs search returns more than one precise source when needed", async
   assert.ok(hits.every((hit) => /^https:\/\/docs\.liara\.ir\//.test(hit.url)));
 });
 
+test("title-aware retrieval preserves exact technical documents", async () => {
+  for (const [query, expectedPath] of [
+    ["قابلیت Embeddings (بردارسازی)", "public/llms/ai/ai-sdk-core/embeddings.md"],
+    ["حذف یک دیتابیس", "public/llms/dbaas/details/delete-database.md"],
+  ]) {
+    const response = await fetch(`${baseUrl}/api/docs-search/?q=${encodeURIComponent(query)}`);
+    assert.equal(response.status, 200, query);
+    const hits = (await response.json()).hits || [];
+    assert.equal(hits[0]?.path, expectedPath, query);
+  }
+});
+
 test("natural Persian learning queries retrieve the closest NextJS documentation", async () => {
   const queries = [
     "nextjs",
@@ -192,7 +204,9 @@ test("API intent matrix stays grounded on the API reference", async () => {
     const hits = (await response.json()).hits || [];
     assert.ok(hits.length > 0, query);
     assert.equal(hits[0].path, "public/llms/references/api/about.md", query);
+    assert.ok(hits.every((hit) => hit.path === "public/llms/references/api/about.md"), query);
     assert.ok(hits[0].category && hits[0].service && hits[0].documentType, query);
+    assert.notEqual(hits[0].service, "about.md", query);
   }
   const chat = await postChat("سرویس api");
   assert.equal(chat.status, 200);

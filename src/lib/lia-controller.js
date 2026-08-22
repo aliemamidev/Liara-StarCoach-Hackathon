@@ -1,4 +1,4 @@
-import { documentationQueryTokens, matchesDocumentationToken, searchDocumentation, searchDocumentationOnline } from "@/lib/docs-search";
+import { documentationQueryTokens, matchesDocumentationToken, redactSensitiveText, searchDocumentation, searchDocumentationOnline } from "@/lib/docs-search";
 import { searchKnowledge } from "@/lib/lia-brain";
 import { searchWeb } from "@/lib/web-search";
 
@@ -234,7 +234,7 @@ function securityRisk(query) {
     : null;
 }
 
-export async function createLiaControllerPlan(messages, settings = {}) {
+async function createLiaControllerPlanInternal(messages, settings = {}) {
   const controllerSettings = {
     webSearchEnabled: settings.webSearchEnabled !== false,
     probableAnswersEnabled: settings.probableAnswersEnabled !== false,
@@ -436,6 +436,39 @@ export async function createLiaControllerPlan(messages, settings = {}) {
     sourceConfidence: Math.max(bestSourceConfidence(hits, retrievalQuery), brainConfidence),
     documentationAvailable,
     metadata: { capturedUnknown: controllerSettings.captureUnknownTopics },
+  };
+}
+
+function debugHit(hit) {
+  return {
+    path: hit.path,
+    url: hit.url,
+    section: redactSensitiveText(hit.section),
+    score: Number.isFinite(Number(hit.score)) ? Number(hit.score.toFixed(4)) : undefined,
+    coverage: hit.coverage,
+    confidence: hit.confidence,
+  };
+}
+
+export async function createLiaControllerPlan(messages, settings = {}) {
+  const plan = await createLiaControllerPlanInternal(messages, settings);
+  const query = latestUserText(messages);
+  const retrievalQueryValue = retrievalText(messages, query);
+  return {
+    ...plan,
+    debugTrace: {
+      query: redactSensitiveText(query).slice(0, 6000),
+      retrievalQuery: redactSensitiveText(retrievalQueryValue).slice(0, 6000),
+      searchTrace: plan.searchTrace || [],
+      decision: plan.decision,
+      stage: plan.stage,
+      sourceConfidence: plan.sourceConfidence,
+      sources: (plan.hits || []).map(debugHit),
+      knowledgeSources: (plan.brainHits || []).map((entry) => ({
+        id: entry.id,
+        question: redactSensitiveText(entry.question).slice(0, 500),
+      })),
+    },
   };
 }
 
