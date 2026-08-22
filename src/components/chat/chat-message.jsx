@@ -139,7 +139,7 @@ export function ChatMessage({ message, onRetry, playSound, isStreaming, isLive, 
         </div>
       )}
       {!isUser && message.metadata?.liaAction === "contact" && onContactSubmit && showContactForm && !isStreaming && (
-        <ContactForm onSubmit={onContactSubmit} disabled={isLive || isStreaming} />
+        <ContactForm onSubmit={onContactSubmit} disabled={isStreaming} />
       )}
       {attachments.length > 0 && (
         <div className="chat-message-attachments">

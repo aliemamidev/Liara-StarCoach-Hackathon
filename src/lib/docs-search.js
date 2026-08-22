@@ -9,15 +9,21 @@ const CHUNK_LENGTH = 2200;
 const CHUNK_OVERLAP = 180;
 const DOCUMENTATION_ROOTS = ["public/llms"];
 const ONLINE_INDEX = "docs";
-const DATABASE_QUERY_PATTERN = /(?:دیتابیس|پایگاه\s+داده|database|postgres(?:ql)?|mysql|mariadb|mongodb|mongo|redis|rabbitmq|elasticsearch|elastic\s*search|mssql|sql\s*server|sqlite|بکاپ|backup|بازیابی|restore|connection\s*pool|اتصال\s+به\s+(?:دیتابیس|پایگاه))/iu;
+const DATABASE_QUERY_PATTERN = /(?:دیتابیس|پایگاه\s+داده|database|postgre\s*sql|mysql|my\s*sql|maria\s*db|mongodb|mongo\s*db|redis|rabbit\s*mq|elastic\s*search|mssql|sql\s*server|sqlite|بکاپ|backup|بازیابی|restore|connection\s*pool|اتصال\s+به\s+(?:دیتابیس|پایگاه))/iu;
 const SEARCH_STOP_WORDS = new Set(["به", "در", "برای", "با", "از", "و", "را", "یک", "این", "آن", "برنامه", "روش", "است", "های", "کردن"]);
 const QUERY_NOISE_WORDS = new Set(["چطور", "چطوری", "چگونه", "نحوه", "میخوام", "می", "خوام", "خواهم", "بگیرم", "گرفتن", "دریافت", "استفاده", "کنم", "کنیم", "میشه", "شود", "کنه", "کند", "چیست", "چیه", "یعنی", "مستندات", "راهنما", "راهنمایی", "کجا", "کار", "رو", "بیارم", "بسازم", "بساز", "ساختن", "یاد", "یادگیری", "یادبگیرم", "یادگرفتن", "آموزش", "آموزشی", "دوره", "شروع", "مسیر"]);
+const DOCUMENTATION_KEYWORD_NOISE = new Set(["امروز", "مشکل", "دارم", "خطا", "ارور", "صفحه", "سفید", "سیاه", "درست", "شده", "شد", "هست", "هستم", "من", "منو", "این", "همین", "چی", "چه", "ببینم", "ignore", "previous", "instructions", "reveal", "system", "prompt"]);
 const SEARCH_ALIAS_REPLACEMENTS = [
   [/\bnext\s*(?:[._-]\s*)?js\b/giu, "nextjs"],
   [/\bnode\s*(?:[._-]\s*)?js\b/giu, "nodejs"],
   [/\bnest\s*(?:[._-]\s*)?js\b/giu, "nestjs"],
   [/\bpostgre\s*sql\b/giu, "postgresql"],
   [/\bmongo\s*db\b/giu, "mongodb"],
+  [/\belastic[\s_-]*search\b/giu, "elasticsearch"],
+  [/\bsql[\s_-]*server\b|\bms[\s_-]*sql\b/giu, "mssql sqlserver"],
+  [/\bmaria\s*db\b/giu, "mariadb"],
+  [/\brabbit\s*mq\b/giu, "rabbitmq"],
+  [/\bmy\s*sql\b/giu, "mysql"],
   [/\btype\s*script\b/giu, "typescript"],
   [/\bjava\s*script\b/giu, "javascript"],
 ];
@@ -25,6 +31,7 @@ const LEARNING_QUERY_PATTERN = /(?:یاد\s*(?:بگیرم|بگیری|گرفتن)
 const LEARNING_DOCUMENT_TYPES = new Set(["getting-started", "quick-start", "create-app", "deploy-app"]);
 const DOCUMENTATION_HOST_PATTERN = /(?:^|\.)liara\.ir$/i;
 let documentsPromise;
+let documentationVocabularyPromise;
 let onlineClient;
 let prismaPromise;
 
@@ -63,7 +70,11 @@ const QUERY_SYNONYMS = [
   [/\bdomain\b|دامنه/iu, "domain domains دامنه dns رکورد"],
   [/\bdns\b|دی\s*ان\s*اس/iu, "dns domain domains رکورد"],
   [/postgres(?:ql)?|پستگرس/iu, "postgres postgresql پستگرس database دیتابیس"],
+  [/mariadb|ماریا/iu, "mariadb maria database دیتابیس"],
+  [/mssql|sql\s*server|مایکروسافت\s*اس\s*کیو\s*ال/iu, "mssql sqlserver database دیتابیس"],
   [/\bredis\b|ردیس/iu, "redis ردیس database دیتابیس"],
+  [/rabbitmq|rabbit\s*mq/iu, "rabbitmq message queue صف پیام"],
+  [/elasticsearch|elastic\s*search/iu, "elasticsearch elastic search database دیتابیس"],
   [/\bbackup\b|بکاپ|پشتیبان|restore|بازیابی/iu, "backup restore بکاپ پشتیبان بازیابی"],
   [/\blog(?:s)?\b|لاگ/iu, "log logs لاگ"],
   [/\bmonitor(?:ing)?\b|مانیتورینگ|نظارت/iu, "monitor monitoring health check metrics مانیتورینگ سلامت"],
@@ -332,11 +343,14 @@ function documentationDomainBoost(relativePath, query) {
     else if (normalizedPath.includes("/dbaas/")) boost -= 3;
   }
   const databaseTechnology = [
-    [/(?:postgres(?:ql)?|پستگرس)/iu, "/postgresql/"],
-    [/(?:mysql|مای.?اس.?کیو.?ال)/iu, "/mysql/"],
-    [/(?:mariadb|ماریا)/iu, "/mariadb/"],
-    [/(?:mongodb|mongo|مانگو)/iu, "/mongodb/"],
+    [/(?:postgre\s*sql|postgres(?:ql)?|پستگرس)/iu, "/postgresql/"],
+    [/(?:my\s*sql|mysql|مای.?اس.?کیو.?ال)/iu, "/mysql/"],
+    [/(?:maria\s*db|mariadb|ماریا)/iu, "/mariadb/"],
+    [/(?:mongo\s*db|mongodb|mongo|مانگو)/iu, "/mongodb/"],
     [/(?:redis|ردیس)/iu, "/redis/"],
+    [/(?:rabbit\s*mq|rabbitmq)/iu, "/rabbitmq/"],
+    [/(?:elastic\s*search|elasticsearch)/iu, "/elastic-search/"],
+    [/(?:mssql|sql\s*server)/iu, "/mssql/"],
   ].find(([pattern]) => pattern.test(query));
   if (databaseTechnology?.[1] && normalizedPath.includes(databaseTechnology[1])) boost += 8;
   if (/(?:\bnode(?:\.js)?\b|نود)/iu.test(query)) {
@@ -355,11 +369,37 @@ function documentationDomainBoost(relativePath, query) {
   return boost;
 }
 
-const TECHNICAL_TERM_PATTERN = /^(?:api|api-key|cli|docker|redis|postgres|postgresql|mysql|mongodb|ssh|http|https|graphql|deploy|deployment|node|node\.js|python|php|token|cors|dns|ssl|tls)$/iu;
+const TECHNICAL_TERM_PATTERN = /^(?:api|api-key|cli|docker|redis|postgres|postgresql|mysql|mongodb|mariadb|mssql|sqlserver|rabbitmq|elasticsearch|ssh|http|https|graphql|deploy|deployment|node|node\.js|python|php|token|cors|dns|ssl|tls)$/iu;
 
 function queryTokensForSearch(value) {
   const salient = queryTokens(value);
   return salient.length ? salient : [...new Set(tokens(value))];
+}
+
+function documentationVocabulary(documents) {
+  const vocabulary = new Set();
+  for (const document of documents) {
+    const values = [
+      document.title,
+      document.section,
+      document.path,
+      document.category,
+      document.service,
+      document.documentType,
+    ];
+    for (const token of tokens(values.filter(Boolean).join(" "))) {
+      if (token.length >= 3 && !SEARCH_STOP_WORDS.has(token) && !QUERY_NOISE_WORDS.has(token) && !DOCUMENTATION_KEYWORD_NOISE.has(token)) vocabulary.add(token);
+    }
+  }
+  return vocabulary;
+}
+
+export async function hasDocumentationKeyword(value) {
+  const query = queryTokensForSearch(value).filter((token) => !DOCUMENTATION_KEYWORD_NOISE.has(token));
+  if (!query.length) return false;
+  documentationVocabularyPromise ||= (documentsPromise ||= loadDocuments()).then(documentationVocabulary);
+  const vocabulary = await documentationVocabularyPromise;
+  return query.some((token) => matchesToken(token, vocabulary));
 }
 
 export function documentationQueryTokens(value) {
@@ -377,7 +417,8 @@ export async function searchDocumentation(query) {
   if (!query?.trim()) return { available: true, hits: [] };
   try {
     const databaseHits = await searchDocumentationDatabase(query);
-    if (databaseHits) return { available: true, hits: rankDocuments(databaseHits, query) };
+    const rankedDatabaseHits = databaseHits?.length ? rankDocuments(databaseHits, query) : [];
+    if (rankedDatabaseHits.length) return { available: true, hits: rankedDatabaseHits };
   } catch {
     // A not-yet-migrated database should not make the chat unusable.
   }

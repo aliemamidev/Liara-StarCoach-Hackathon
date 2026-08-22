@@ -19,6 +19,9 @@ import { LIA_PROBABLE_SYSTEM_PROMPT, LIA_SYSTEM_PROMPT } from "@/lib/lia-persona
 import { validateChatMessages } from "@/lib/chat-message-validation.mjs";
 import { originalMessagesForContactFlow } from "@/lib/contact-flow.mjs";
 
+const CONTACT_DECLINE_PATTERN = /(?:نمی\s*(?:خوام|خواهم)|نمی‌\s*(?:خوام|خواهم)|نمی‌خواهم|نمیخوام|لغو|انصراف).{0,40}(?:ادمین|تماس|اطلاعات|شماره|ارجاع)|(?:ادمین|تماس|اطلاعات|شماره|ارجاع).{0,40}(?:نمی\s*(?:خوام|خواهم)|نمی‌خواهم|نمیخوام|لغو|انصراف)/iu;
+const CONTACT_DECLINED_MESSAGE = "## پاسخ\n\nباشه، به ادمین ارجاعت نمی‌دهم. سؤال فنی‌ات را بر اساس مستندات لیارا بررسی می‌کنم. اگر دربارهٔ MongoDB مشکلی داری، دقیقاً بگو می‌خواهی چه کاری انجام دهی؛ مثلاً ساخت دیتابیس، اتصال برنامه یا دریافت Connection String.";
+
 function pipeStaticMessage(response, messages, message, stage, metadata = {}) {
   const stream = createUIMessageStream({
     originalMessages: messages,
@@ -140,6 +143,9 @@ export default async function handler(req, res) {
     const settings = await getAdminSettings();
     const priorAssistant = previousAssistant(messages);
     if (!owner.userId && priorAssistant?.metadata?.liaStage === CONTACT_STAGE) {
+      if (CONTACT_DECLINE_PATTERN.test(latestUserText(messages))) {
+        return await pipeStaticMessage(res, messages, CONTACT_DECLINED_MESSAGE, LIA_STAGES.ANSWER);
+      }
       const contact = parseGuestContact(latestUserText(messages));
       if (!contact) return await pipeContactRequest(res, messages);
       const originalMessages = originalMessagesForContactFlow(messages);
@@ -175,7 +181,7 @@ export default async function handler(req, res) {
 
     const config = getAiConfig();
     if (!isAiConfigured(config)) {
-      return await pipeEscalation(res, messages, chatId, plan, undefined, "ai_not_configured");
+      return await pipeStaticMessage(res, messages, DOCUMENTATION_UNAVAILABLE_MESSAGE, plan.stage, sourceMetadata(plan));
     }
     const provider = createOpenAICompatible({
       name: "liara-router",
@@ -190,7 +196,7 @@ export default async function handler(req, res) {
     }
     if (isUnsafeLiaDraft(answer)) return await pipeStaticMessage(res, messages, UNSAFE_DRAFT_MESSAGE, plan.stage);
     if (!validateLiaDraft(answer)) {
-      return await pipeEscalation(res, messages, chatId, plan, undefined, "invalid_ai_draft");
+      return await pipeStaticMessage(res, messages, AI_UNAVAILABLE_MESSAGE, plan.stage, sourceMetadata(plan));
     }
     const finalText = `${answer.trim()}${screenshotFollowup(plan)}`;
     const responseMetadata = { ...sourceMetadata(plan), ...(plan.metadata || {}) };

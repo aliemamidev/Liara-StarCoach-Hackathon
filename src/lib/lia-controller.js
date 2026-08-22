@@ -1,4 +1,4 @@
-import { documentationQueryTokens, matchesDocumentationToken, redactSensitiveText, searchDocumentation, searchDocumentationOnline } from "@/lib/docs-search";
+import { documentationQueryTokens, hasDocumentationKeyword, matchesDocumentationToken, redactSensitiveText, searchDocumentation, searchDocumentationOnline } from "@/lib/docs-search";
 import { searchKnowledge } from "@/lib/lia-brain";
 import { searchWeb } from "@/lib/web-search";
 
@@ -146,9 +146,9 @@ function hasImageAttachment(messages) {
   return (latestUserMessage?.parts || []).some((part) => part?.type === "file" && String(part.mediaType || "").startsWith("image/"));
 }
 
-const IN_SCOPE_PATTERN = /(?:هوش مصنوعی|یادگیری ماشین|یادگیری ماشینی|مدل زبان|چت‌?بات|الگوریتم|پرامپت|توکن|پردازش متن|تکنولوژی|فناوری|کامپیوتر|رایانه|برنامه‌نویسی|برنامه نویسی|کدنویسی|کد|پایتون|جاوااسکریپت|تایپ‌?اسکریپت|جاوا|php|node(?:\.js)?|react|next(?:\.js)?|vue|sql|api|sdk|http|سرور|کلود|ابری|دیتابیس|پایگاه داده|داده|شبکه|امنیت|رمزنگاری|لینوکس|ویندوز|گیت|docker|کانتینر|استقرار|دیپلوی|deploy|دامنه|dns|وب‌?سایت|سایت|اپلیکیشن|نرم‌افزار|نرم افزار|لینک|فایل|خطا|ارور|لاگ|پایگاه دانش|مستندات|documentation|لیارا|liara|پنل|حساب کاربری|سرویس|صورتحساب|فاکتور|ذخیره‌?سازی|پشتیبان|بکاپ|redis|mysql|mongodb|postgres|آی‌?پی|پورت|ssl|tls|ssh|cors|cdn|github|gitlab|اسکرین‌?شات|screenshot)/iu;
+const IN_SCOPE_PATTERN = /(?:هوش مصنوعی|یادگیری ماشین|یادگیری ماشینی|مدل زبان|چت‌?بات|الگوریتم|پرامپت|توکن|پردازش متن|تکنولوژی|فناوری|کامپیوتر|رایانه|برنامه‌نویسی|برنامه نویسی|کدنویسی|کد|پایتون|جاوااسکریپت|تایپ‌?اسکریپت|جاوا|php|node(?:\.js)?|react|next(?:\.js)?|vue|sql|api|sdk|http|سرور|کلود|ابری|دیتابیس|پایگاه داده|داده|شبکه|امنیت|رمزنگاری|لینوکس|ویندوز|گیت|docker|کانتینر|استقرار|دیپلوی|deploy|دامنه|dns|وب‌?سایت|سایت|اپلیکیشن|نرم‌افزار|نرم افزار|لینک|فایل|خطا|ارور|لاگ|پایگاه دانش|مستندات|documentation|لیارا|liara|پنل|حساب کاربری|سرویس|صورتحساب|فاکتور|ذخیره‌?سازی|پشتیبان|بکاپ|redis|mysql|mongodb|postgres|mariadb|mssql|sql\s*server|rabbitmq|elastic(?:search|\s*search)|آی‌?پی|پورت|ssl|tls|ssh|cors|cdn|github|gitlab|اسکرین‌?شات|screenshot)/iu;
 const TECHNICAL_SYMPTOM_PATTERN = /(?:برنامه\s*(?:م|ام|من)|اپلیکیشن\s*(?:م|ام|من)|سایت\s*(?:م|ام|من)|کار نمی\s*(?:کند|کنه)|درست نیست|خراب شده|مشکل دارم|خطا دارم|ارور دارم|صفحه\s+(?:سفید|سیاه)|اسکرین\s*شات)/iu;
-const TECHNICAL_ENTITY_PATTERN = /(?:api|api\s*key|cli|sdk|http|graphql|docker|redis|mysql|mongodb|postgres(?:ql)?|ssh|node(?:\.js)?|python|php|react|next(?:\.js)?|dns|ssl|tls|cors|cdn|github|gitlab|دیتابیس|پایگاه داده|استقرار|دیپلوی|deploy|دامنه|سرور|لیارا|liara)/iu;
+const TECHNICAL_ENTITY_PATTERN = /(?:api|api\s*key|cli|sdk|http|graphql|docker|redis|mysql|mongodb|postgres(?:ql)?|mariadb|mssql|sql\s*server|rabbitmq|elastic(?:search|\s*search)|ssh|node(?:\.js)?|python|php|react|next(?:\.js)?|dns|ssl|tls|cors|cdn|github|gitlab|دیتابیس|پایگاه داده|استقرار|دیپلوی|deploy|دامنه|سرور|لیارا|liara)/iu;
 const QUERY_ACTION_PATTERN = /(?:چطور|چطوری|چگونه|نحوه|میخوام|می\s+خوام|بگیرم|گرفتن|دریافت|استفاده|ساخت|ایجاد|مستندات|راهنما|چیست|معرفی)/iu;
 const QUERY_CONTEXT_REFERENCE_PATTERN = /(?:این|همین|آن|اون|همان|ادامه|قبلی|بالا|این مورد|همین مورد|چطورش|پس)/iu;
 
@@ -193,7 +193,7 @@ function detectedService(query) {
 function hasGoal(query) {
   const normalized = normalizeText(query);
   if (GENERAL_TECHNICAL_EXPLANATION_PATTERN.test(normalized) && tokens(normalized).length >= 2) return true;
-  if (TECHNICAL_ENTITY_PATTERN.test(normalized) && (tokens(normalized).length <= 3 || QUERY_ACTION_PATTERN.test(normalized))) return true;
+  if (TECHNICAL_ENTITY_PATTERN.test(normalized) && (tokens(normalized).length <= 6 || QUERY_ACTION_PATTERN.test(normalized))) return true;
   return tokens(normalized).length >= 4 && !/^(?:کمک|مشکل دارم|خطا|ارور|help|error)$/iu.test(normalized);
 }
 
@@ -247,6 +247,7 @@ async function createLiaControllerPlanInternal(messages, settings = {}) {
   const retrievalQuery = retrievalText(messages, query);
   const contextQuery = retrievalText(messages, query);
   const hasImage = hasImageAttachment(messages);
+  const documentationKeyword = await hasDocumentationKeyword(contextQuery).catch(() => false);
 
   if (isGreeting(query)) {
     return { mode: LIA_STAGES.ANSWER, stage: LIA_STAGES.ANSWER, query, hits: [], brainHits: [], searchTrace: ["greeting"], classification: "greeting", decision: "static_answer", reason: "greeting", sourceConfidence: 0, metadata: { staticAnswer: GREETING_MESSAGE } };
@@ -271,11 +272,11 @@ async function createLiaControllerPlanInternal(messages, settings = {}) {
     };
   }
 
-  if (!isLikelyInScope(contextQuery) && !hasImage) {
+  if (!isLikelyInScope(contextQuery) && !documentationKeyword && !hasImage) {
     return { mode: LIA_STAGES.OUT_OF_SCOPE, stage: LIA_STAGES.OUT_OF_SCOPE, query, hits: [], brainHits: [], searchTrace: [], classification: "out_of_scope", decision: "out_of_scope", reason: "outside_liara_domain", sourceConfidence: 0 };
   }
 
-  const generalTechnical = isGeneralTechnicalQuery(contextQuery) || hasImage;
+  const generalTechnical = isGeneralTechnicalQuery(contextQuery) || documentationKeyword || hasImage;
   const visualRequired = needsVisualDiagnosis(`${conversation} ${query}`) && !hasImage;
   const screenshotFollowup = hasImage && priorStage === LIA_STAGES.SCREENSHOT;
   if (!understandingComplete(contextQuery) && !generalTechnical && !visualRequired && !screenshotFollowup) {

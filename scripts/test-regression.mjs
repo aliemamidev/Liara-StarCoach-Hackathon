@@ -142,6 +142,25 @@ test("local docs search returns more than one precise source when needed", async
   assert.ok(hits.every((hit) => /^https:\/\/docs\.liara\.ir\//.test(hit.url)));
 });
 
+test("database keyword aliases stay grounded across every Liara DB service", async () => {
+  for (const [query, expectedPath] of [
+    ["Mongo DB", /dbaas\/mongodb/i],
+    ["My SQL", /dbaas\/mysql/i],
+    ["Postgre SQL", /dbaas\/postgresql/i],
+    ["Maria DB", /dbaas\/mariadb/i],
+    ["SQL Server", /dbaas\/mssql/i],
+    ["Rabbit MQ", /dbaas\/rabbitmq/i],
+    ["Elastic Search", /dbaas\/elastic-search/i],
+    ["Redis", /dbaas\/redis/i],
+  ]) {
+    const response = await fetch(`${baseUrl}/api/docs-search/?q=${encodeURIComponent(query)}`);
+    assert.equal(response.status, 200, query);
+    const hits = (await response.json()).hits || [];
+    assert.ok(hits.length > 0, query);
+    assert.match(hits[0].path, expectedPath, query);
+  }
+});
+
 test("title-aware retrieval preserves exact technical documents", async () => {
   for (const [query, expectedPath] of [
     ["قابلیت Embeddings (بردارسازی)", "public/llms/ai/ai-sdk-core/embeddings.md"],

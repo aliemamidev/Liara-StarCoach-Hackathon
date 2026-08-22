@@ -1,4 +1,4 @@
-import { Sparkles } from "lucide-react";
+import Image from "next/image";
 
 const suggestions = [
   "چطور پروژه‌ام را روی لیارا مستقر کنم؟",
@@ -10,7 +10,7 @@ export function ChatEmptyState({ onSuggestion }) {
   return (
     <section className="chat-empty-state" aria-labelledby="chat-empty-title">
       <div className="chat-empty-mark" aria-hidden="true">
-        <Sparkles size={20} />
+        <Image src="/static/images/lia-avatar.png" alt="" width={44} height={44} />
       </div>
       <h1 id="chat-empty-title">سلام، من لیا هستم</h1>
       <p>پرسش فنی‌ات دربارهٔ محصولات و سرویس‌های لیارا را بپرس تا بر اساس مستندات راهنمایی‌ات کنم.</p>
@@ -29,7 +29,6 @@ export function ChatEmptyState({ onSuggestion }) {
     </section>
   );
 }
-
 
 
 

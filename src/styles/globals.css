@@ -1125,7 +1125,8 @@ pre code {
 .chat-shell *::-webkit-scrollbar-thumb:hover { background: hsl(var(--chat-accent)); background-clip: padding-box; }
 .chat-persistence-banner { flex: 0 0 auto; border-bottom: 1px solid hsl(var(--chat-border)); background: hsl(var(--chat-surface-muted)); color: hsl(var(--chat-muted)); font-size: 11px; line-height: 1.7; padding: 7px 16px; text-align: center; }
 .chat-empty-state { margin: auto; max-width: 640px; padding: 56px 0 64px; text-align: center; }
-.chat-empty-mark { display: inline-flex; align-items: center; justify-content: center; height: 44px; width: 44px; border: 1px solid hsl(var(--chat-border)); border-radius: 14px; color: hsl(var(--chat-accent)); }
+.chat-empty-mark { display: inline-flex; align-items: center; justify-content: center; height: 44px; width: 44px; overflow: hidden; border: 1px solid hsl(var(--chat-border)); border-radius: 14px; background: hsl(var(--chat-surface-muted)); }
+.chat-empty-mark img { height: 100%; width: 100%; object-fit: cover; }
 .chat-empty-state h1 { margin-top: 22px; font-size: clamp(24px, 4vw, 36px); font-weight: 800; letter-spacing: -0.03em; }
 .chat-empty-state p { margin-top: 10px; color: hsl(var(--chat-muted)); font-size: 14px; }
 .chat-suggestions { display: flex; flex-wrap: wrap; justify-content: center; gap: 8px; margin-top: 30px; }
