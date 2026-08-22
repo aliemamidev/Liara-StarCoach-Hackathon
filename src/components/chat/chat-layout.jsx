@@ -225,16 +225,18 @@ export function ChatLayout() {
 
   return (
     <main className="chat-shell" dir="rtl">
-      <ChatHeader
-        title={activeChat?.title || "گفتگوی جدید"}
-        onOpenSettings={() => {
-          setSettingsOpen(true);
-          sound.playSound("toggle");
-        }}
-
-      />
-      {offline && <div className="chat-persistence-banner" role="status">اتصال ذخیره‌سازی برقرار نیست؛ نمایش فعلی موقت است و پس از بازگشت اتصال همگام می‌شود.</div>}
-      <section ref={messagesViewportRef} className="chat-main">
+      <div className="chat-topbar">
+        <ChatHeader
+          title={activeChat?.title || "گفتگوی جدید"}
+          onOpenSettings={() => {
+            setSettingsOpen(true);
+            sound.playSound("toggle");
+          }}
+        />
+        {offline && <div className="chat-persistence-banner" role="status">اتصال ذخیره‌سازی برقرار نیست؛ نمایش فعلی موقت است و پس از بازگشت اتصال همگام می‌شود.</div>}
+      </div>
+      <div className="chat-workspace">
+        <section ref={messagesViewportRef} className="chat-main">
         {messages.length === 0 ? (
           <ChatEmptyState onSuggestion={submitMessage} />
         ) : (
@@ -256,8 +258,8 @@ export function ChatLayout() {
             <Button variant="ghost" size="sm" onClick={retry}>تلاش دوباره</Button>
           </div>
         )}
-      </section>
-      <ChatComposer
+        </section>
+        <ChatComposer
         value={input}
         onChange={setInput}
         files={files}
@@ -268,7 +270,16 @@ export function ChatLayout() {
         onSubmit={() => submitMessage()}
         status={status}
         playSound={sound.playSound}
-      />
+        />
+        <ChatHistory
+          history={chatHistory.history}
+          activeChatId={chatHistory.activeChatId}
+          onSelect={selectChat}
+          onNewChat={startNewChat}
+          onRename={chatHistory.renameChat}
+          onDelete={(id) => { if (window.confirm("این گفتگو حذف شود؟")) chatHistory.deleteChat(id); }}
+        />
+      </div>
       <Link href="/documentation" className="chat-docs-link">
         <BookOpen size={17} aria-hidden="true" />
         <span>مستندات اصلی</span>
@@ -281,14 +292,6 @@ export function ChatLayout() {
         playSound={sound.playSound}
       />
 
-      <ChatHistory
-        history={chatHistory.history}
-        activeChatId={chatHistory.activeChatId}
-        onSelect={selectChat}
-        onNewChat={startNewChat}
-        onRename={chatHistory.renameChat}
-        onDelete={(id) => { if (window.confirm("این گفتگو حذف شود؟")) chatHistory.deleteChat(id); }}
-      />
       <ScreenshotSourceDialog
         open={screenshotSourceOpen}
         onOpenChange={setScreenshotSourceOpen}

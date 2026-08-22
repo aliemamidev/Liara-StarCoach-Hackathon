@@ -417,3 +417,138 @@ sidebar[class*="bg-[#fbfbfb]"] .badge {
     transition: none !important;
   }
 }
+
+/* Scoped visual alignment for admin pages other than the Dashboard reference. */
+.admin-page-panel {
+  border-color: hsl(var(--site-border));
+  background: hsl(var(--site-surface));
+  box-shadow: 0 10px 35px hsl(var(--site-card-shadow) / .08);
+}
+
+.admin-page-view,
+.admin-page-view > div {
+  min-width: 0;
+}
+
+.admin-page-view > div {
+  border-color: hsl(var(--site-border));
+  background: hsl(var(--site-surface));
+  box-shadow: 0 10px 35px hsl(var(--site-card-shadow) / .08);
+}
+
+.admin-page-alert {
+  border-color: hsl(var(--site-danger) / .28);
+  background: hsl(var(--site-danger) / .1);
+  color: hsl(var(--site-danger-foreground));
+}
+
+.admin-shell main table {
+  border-collapse: separate;
+  border-spacing: 0;
+}
+
+.admin-shell main table thead {
+  background: hsl(var(--site-bg));
+  color: hsl(var(--site-muted));
+}
+
+.admin-shell main table tbody tr {
+  border-color: hsl(var(--site-border));
+  transition: background-color 160ms ease;
+}
+
+.admin-shell main table tbody tr:hover {
+  background: hsl(var(--site-bg) / .72);
+}
+
+.admin-shell main select,
+.admin-shell main input,
+.admin-shell main textarea {
+  border-color: hsl(var(--site-border));
+  background-color: hsl(var(--site-input) / .72);
+  color: hsl(var(--site-text));
+}
+
+.admin-shell main select:focus-visible,
+.admin-shell main input:focus-visible,
+.admin-shell main textarea:focus-visible {
+  outline: 2px solid hsl(var(--site-accent) / .45);
+  outline-offset: 1px;
+}
+
+/* Keep the off-canvas export surface out of the document's mobile scroll width. */
+.admin-shell [class*="-left-[10000px]"] {
+  position: fixed;
+}
+
+.admin-knowledge-dialog {
+  display: flex;
+  width: min(560px, calc(100vw - 2rem));
+  max-width: 560px;
+  max-height: min(720px, calc(100dvh - 2rem));
+  flex-direction: column;
+  overflow: hidden !important;
+  padding: 0;
+}
+
+.admin-knowledge-header {
+  flex: 0 0 auto;
+  border-bottom: 1px solid hsl(var(--site-border));
+  background: hsl(var(--site-surface));
+  padding: 1.15rem 4.25rem 1rem 1.25rem;
+}
+
+.admin-knowledge-form {
+  min-height: 0;
+  flex: 1 1 auto;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  padding: 1.25rem;
+}
+
+.admin-conversation-dialog {
+  display: flex;
+  width: min(640px, calc(100vw - 2rem));
+  max-width: 640px;
+  max-height: min(78dvh, 620px);
+  flex-direction: column;
+  overflow: hidden !important;
+}
+
+.admin-conversation-header {
+  flex: 0 0 auto;
+}
+
+.admin-conversation-body {
+  min-height: 0;
+  max-height: none;
+  flex: 1 1 auto;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+}
+
+@media (max-width: 639px) {
+  .admin-page-view {
+    gap: 1rem;
+  }
+
+  .admin-knowledge-dialog {
+    width: calc(100vw - 1rem);
+    max-height: calc(100dvh - 1rem);
+    border-radius: 1rem;
+  }
+
+  .admin-knowledge-header {
+    padding: .9rem 3.75rem .85rem 1rem;
+  }
+
+  .admin-knowledge-form {
+    padding: 1rem;
+  }
+
+  .admin-conversation-dialog {
+    width: calc(100vw - 1rem);
+    max-height: calc(100dvh - 1rem);
+    border-radius: 1rem;
+  }
+}
