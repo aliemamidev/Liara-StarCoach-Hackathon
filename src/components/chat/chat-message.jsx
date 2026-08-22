@@ -14,6 +14,19 @@ function messageText(message) {
     .join("");
 }
 
+function formatMessageTime(createdAt) {
+  if (!createdAt) return "";
+  const date = new Date(createdAt);
+  if (Number.isNaN(date.getTime())) return "";
+  return new Intl.DateTimeFormat("fa-IR-u-ca-persian-nu-arabext", {
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+    hour: "2-digit",
+    minute: "2-digit",
+  }).format(date);
+}
+
 const markdownComponents = {
   a: ({ href = "", children }) => <LinkPreviewCard href={href}>{children}</LinkPreviewCard>,
 };
@@ -25,6 +38,7 @@ export function LiaIdentity() {
 export function ChatMessage({ message, onRetry, playSound, isStreaming, isLive, onScreenshot }) {
   const content = messageText(message);
   const isUser = message.role === "user";
+  const messageTime = formatMessageTime(message.createdAt);
   const attachments = (message.parts || []).filter((part) => part.type === "file" && part.url);
   const [displayedContent, setDisplayedContent] = useState(() => (isLive ? "" : content));
   const [isRevealing, setIsRevealing] = useState(isLive);
@@ -87,6 +101,7 @@ export function ChatMessage({ message, onRetry, playSound, isStreaming, isLive, 
           )
         ) : ""}
       </div>
+      {isUser && messageTime && <time className="chat-message-time" dateTime={new Date(message.createdAt).toISOString()}>{messageTime}</time>}
       {!isUser && sourceItems.length > 0 && <div className="chat-message-sources"><p>منابع پاسخ</p>{sourceItems.map((source) => <LinkPreviewCard key={source.url} href={source.url} imageUrl={source.imageUrl} description={source.description}>{source.title}</LinkPreviewCard>)}</div>}
       {!isUser && message.metadata?.liaAction === "screenshot" && onScreenshot && (
         <div className="mt-3 rounded-2xl border border-[hsl(var(--chat-accent)/.25)] bg-[hsl(var(--chat-accent)/.07)] p-3">

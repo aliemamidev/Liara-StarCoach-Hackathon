@@ -1,12 +1,9 @@
-import { Check, Clock3, MessageSquarePlus, Pencil, Trash2, X } from "lucide-react";
+import { Check, ChevronLeft, ChevronRight, MessageSquarePlus, Pencil, Trash2, X } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
 import { Button } from "@/components/ui/button";
 
-function formatDate(timestamp) {
-  return new Intl.DateTimeFormat("fa-IR", { dateStyle: "short", timeStyle: "short" }).format(timestamp);
-}
-
 export function ChatHistory({ history, activeChatId, onSelect, onNewChat, onDelete, onRename }) {
+  const [open, setOpen] = useState(true);
   const [editingId, setEditingId] = useState(null);
   const [draftTitle, setDraftTitle] = useState("");
   const inputRef = useRef(null);
@@ -41,7 +38,20 @@ export function ChatHistory({ history, activeChatId, onSelect, onNewChat, onDele
   }
 
   return (
-    <aside className="chat-history-dock" dir="rtl" aria-label="تاریخچه‌ی گفتگوها">
+    <aside className={`chat-history-dock ${open ? "is-open" : "is-collapsed"}`} dir="rtl" aria-label="تاریخچه‌ی گفتگوها">
+      <button
+        type="button"
+        className="chat-history-toggle"
+        onClick={() => setOpen((value) => !value)}
+        aria-expanded={open}
+        aria-controls="chat-history-list"
+        aria-label={open ? "بستن تاریخچه‌ی گفتگوها" : "باز کردن تاریخچه‌ی گفتگوها"}
+        title={open ? "بستن تاریخچه" : "باز کردن تاریخچه"}
+      >
+        {open ? <ChevronRight size={18} aria-hidden="true" /> : <ChevronLeft size={18} aria-hidden="true" />}
+        {open && <span>تاریخچه</span>}
+      </button>
+      {!open ? null : <>
         <div className="chat-history-dock-header">
           <h2>تاریخچه‌ی گفتگوها</h2>
           <p>گفتگوهای ذخیره‌شده در همین مرورگر</p>
@@ -49,7 +59,7 @@ export function ChatHistory({ history, activeChatId, onSelect, onNewChat, onDele
         <Button type="button" className="mt-6 w-full justify-start" onClick={onNewChat}>
           <MessageSquarePlus size={17} aria-hidden="true" /> چت جدید
         </Button>
-        <div className="chat-history-list" aria-label="فهرست گفتگوها">
+        <div id="chat-history-list" className="chat-history-list" aria-label="فهرست گفتگوها">
           {!history.length && <p className="chat-history-empty">هنوز گفتگویی ذخیره نشده است.</p>}
           {history.map((chat) => (
             <div className={`chat-history-item ${chat.id === activeChatId ? "is-active" : ""}`} key={chat.id}>
@@ -72,12 +82,11 @@ export function ChatHistory({ history, activeChatId, onSelect, onNewChat, onDele
                 </div>
               ) : (
                 <>
-                  <button type="button" className="chat-history-title" data-cuelume-press="press" data-cuelume-release="release" onClick={() => startEditing(chat)} title="ویرایش نام گفتگو">
-                    <span className="truncate">{chat.title || "گفتگوی جدید"}</span>
-                    <Pencil size={13} aria-hidden="true" />
+                  <button type="button" className="chat-history-title" data-cuelume-press="press" data-cuelume-release="release" onClick={() => onSelect(chat.id)} title="باز کردن گفتگو">
+                    <span>{chat.title || "گفتگوی جدید"}</span>
                   </button>
-                  <button type="button" className="chat-history-open" data-cuelume-press="press" data-cuelume-release="release" onClick={() => onSelect(chat.id)}>
-                    <small><Clock3 size={12} aria-hidden="true" /> {formatDate(chat.updatedAt)}</small>
+                  <button type="button" className="chat-history-edit-button" onClick={() => startEditing(chat)} title="ویرایش نام گفتگو" aria-label={`ویرایش ${chat.title || "گفتگوی جدید"}`}>
+                    <Pencil size={13} aria-hidden="true" />
                   </button>
                   <Button type="button" variant="ghost" size="icon" className="h-8 w-8 shrink-0" onClick={() => onDelete(chat.id)} aria-label={`حذف ${chat.title}`}>
                     <Trash2 size={15} aria-hidden="true" />
@@ -87,6 +96,7 @@ export function ChatHistory({ history, activeChatId, onSelect, onNewChat, onDele
             </div>
           ))}
         </div>
+      </>}
     </aside>
   );
 }

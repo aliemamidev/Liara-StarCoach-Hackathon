@@ -232,8 +232,33 @@ sidebar[class*="bg-[#fbfbfb]"] .badge {
 /* Admin layout guardrails: preserve desktop geometry while preventing mobile leaks. */
 .admin-shell {
   min-width: 0;
+  direction: ltr;
   overflow-x: clip;
 }
+
+.admin-shell > * { direction: rtl; }
+.admin-shell,
+.admin-shell *,
+body:has(.admin-shell),
+html:has(.admin-shell) {
+  scrollbar-width: thin;
+  scrollbar-color: hsl(var(--chat-accent) / .55) transparent;
+}
+.admin-shell *::-webkit-scrollbar,
+body:has(.admin-shell)::-webkit-scrollbar,
+html:has(.admin-shell)::-webkit-scrollbar { width: 8px; height: 8px; }
+.admin-shell *::-webkit-scrollbar-track,
+body:has(.admin-shell)::-webkit-scrollbar-track,
+html:has(.admin-shell)::-webkit-scrollbar-track { border-radius: 999px; background: transparent; }
+.admin-shell *::-webkit-scrollbar-thumb,
+body:has(.admin-shell)::-webkit-scrollbar-thumb,
+html:has(.admin-shell)::-webkit-scrollbar-thumb { border: 2px solid transparent; border-radius: 999px; background: hsl(var(--chat-border)); background-clip: padding-box; transition: background-color 160ms ease; }
+.admin-shell *:hover::-webkit-scrollbar-thumb,
+body:has(.admin-shell):hover::-webkit-scrollbar-thumb,
+html:has(.admin-shell):hover::-webkit-scrollbar-thumb { background: hsl(var(--chat-accent) / .58); background-clip: padding-box; }
+.admin-shell *::-webkit-scrollbar-thumb:hover,
+body:has(.admin-shell)::-webkit-scrollbar-thumb:hover,
+html:has(.admin-shell)::-webkit-scrollbar-thumb:hover { background: hsl(var(--chat-accent)); background-clip: padding-box; }
 
 .admin-shell .admin-card { box-shadow: 0 10px 35px hsl(var(--site-card-shadow) / .08); }
 .lia-assistant-badge { display: inline-flex; align-items: center; gap: .75rem; min-width: 0; }
