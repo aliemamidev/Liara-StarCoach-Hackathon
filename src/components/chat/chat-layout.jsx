@@ -249,6 +249,7 @@ export function ChatLayout() {
             isLive={liveResponseRef.current}
             scrollContainerRef={messagesViewportRef}
             onScreenshot={() => { setScreenshotError(""); setScreenshotSourceOpen(true); }}
+            onContactSubmit={(name, phone) => submitMessage(`نام و نام خانوادگی: ${name}\nشماره تماس: ${phone}`)}
           />
         )}
         {error && (

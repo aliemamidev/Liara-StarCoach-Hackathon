@@ -35,9 +35,35 @@ export function LiaIdentity() {
   return <div className="chat-message-identity"><span className="chat-message-avatar"><Image src="/static/images/lia-avatar.png" alt="آواتار لیا" width={48} height={48} /></span><span><strong>لیا</strong><small>دستیار لیارا</small></span></div>;
 }
 
-export function ChatMessage({ message, onRetry, playSound, isStreaming, isLive, onScreenshot }) {
+function ContactForm({ onSubmit, disabled }) {
+  const [name, setName] = useState("");
+  const [phone, setPhone] = useState("");
+  const [error, setError] = useState("");
+
+  function submit(event) {
+    event.preventDefault();
+    const cleanName = name.trim();
+    const cleanPhone = phone.trim();
+    if (!cleanName) return setError("نام و نام خانوادگی را وارد کنید.");
+    if (!/^(?:\+98|98|0)?9\d{9}$/.test(cleanPhone.replace(/[\s()-]/g, ""))) return setError("شماره تماس معتبر وارد کنید.");
+    setError("");
+    onSubmit(cleanName, cleanPhone);
+  }
+
+  return <form className="chat-contact-form" onSubmit={submit} aria-label="اطلاعات تماس برای ارجاع به ادمین">
+    <div className="chat-contact-fields">
+      <label>نام و نام خانوادگی<input value={name} onChange={(event) => setName(event.target.value)} disabled={disabled} autoComplete="name" /></label>
+      <label>شماره تماس<input value={phone} onChange={(event) => setPhone(event.target.value)} disabled={disabled} inputMode="tel" autoComplete="tel" dir="ltr" /></label>
+    </div>
+    {error && <p className="chat-contact-error" role="alert">{error}</p>}
+    <Button type="submit" className="mt-3 min-h-11" disabled={disabled}>ثبت و ارسال</Button>
+  </form>;
+}
+
+export function ChatMessage({ message, onRetry, playSound, isStreaming, isLive, onScreenshot, onContactSubmit, showContactForm }) {
   const content = messageText(message);
   const isUser = message.role === "user";
+  const isAdminAnswer = message.metadata?.liaStage === "admin_answer";
   const messageTime = formatMessageTime(message.createdAt);
   const attachments = (message.parts || []).filter((part) => part.type === "file" && part.url);
   const [displayedContent, setDisplayedContent] = useState(() => (isLive ? "" : content));
@@ -90,8 +116,8 @@ export function ChatMessage({ message, onRetry, playSound, isStreaming, isLive, 
   ].filter((source, index, sources) => source?.url && sources.findIndex((item) => item.url === source.url) === index);
 
   return (
-    <article className={isUser ? "chat-message chat-message-user" : "chat-message chat-message-assistant"}>
-      {isUser ? <div className="chat-message-label">شما</div> : <LiaIdentity />}
+    <article className={isUser ? "chat-message chat-message-user" : `chat-message chat-message-assistant${isAdminAnswer ? " chat-message-admin-answer" : ""}`}>
+      {isUser ? <div className="chat-message-label">شما</div> : isAdminAnswer ? <div className="chat-admin-answer-label">پاسخ ادمین</div> : <LiaIdentity />}
       <div className={`chat-message-content${isUser ? " chat-message-content-plain" : " chat-message-content-markdown"}`}>
         {renderedContent ? (
           isUser ? renderedContent : (
@@ -111,6 +137,9 @@ export function ChatMessage({ message, onRetry, playSound, isStreaming, isLive, 
             عکس از صفحه
           </Button>
         </div>
+      )}
+      {!isUser && message.metadata?.liaAction === "contact" && onContactSubmit && showContactForm && !isStreaming && (
+        <ContactForm onSubmit={onContactSubmit} disabled={isLive || isStreaming} />
       )}
       {attachments.length > 0 && (
         <div className="chat-message-attachments">

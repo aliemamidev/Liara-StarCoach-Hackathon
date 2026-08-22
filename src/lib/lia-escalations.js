@@ -133,6 +133,7 @@ export async function answerEscalation({ id, adminId, answer, assistantText, add
         id: randomUUID(),
         chatId: ticket.chatId,
         role: "assistant",
+        metadata: { liaStage: "admin_answer", source: "admin" },
         parts: [{ type: "text", text: assistantText }],
       },
     });

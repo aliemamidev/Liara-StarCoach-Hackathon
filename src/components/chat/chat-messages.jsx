@@ -3,7 +3,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { Button } from "@/components/ui/button";
 import { ChatMessage, LiaIdentity } from "@/components/chat/chat-message";
 
-export function ChatMessages({ messages, status, onRetry, playSound, isLive = false, scrollContainerRef, onScreenshot }) {
+export function ChatMessages({ messages, status, onRetry, playSound, isLive = false, scrollContainerRef, onScreenshot, onContactSubmit }) {
   const previousMessageCountRef = useRef(messages.length);
   const pinnedToBottomRef = useRef(true);
   const liveMessageIdRef = useRef(null);
@@ -62,6 +62,8 @@ export function ChatMessages({ messages, status, onRetry, playSound, isLive = fa
             isStreaming={isStreaming && index === messages.length - 1 && message.role === "assistant"}
             isLive={liveMessageIdRef.current === message.id}
             onScreenshot={onScreenshot}
+            onContactSubmit={onContactSubmit}
+            showContactForm={index === messages.length - 1}
           />
         ))}
         {isStreaming && messages[messages.length - 1]?.role === "user" && (
