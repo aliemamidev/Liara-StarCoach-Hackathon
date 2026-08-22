@@ -283,11 +283,7 @@ function scoreDocument(document, query, queryTokens) {
 
 function rankDocuments(documents, query) {
   const queryTokens = queryTokensForSearch(query);
-  const minimumCoverage = queryTokens.length === 1
-    ? 1
-    : queryTokens.length <= 5
-      ? Math.ceil(queryTokens.length * 0.67)
-      : Math.max(2, Math.ceil(queryTokens.length * 0.35));
+  const minimumCoverage = Math.ceil(queryTokens.length * 0.6);
   const ranked = documents
     .map((document) => scoreDocument(searchableDocument(document), query, queryTokens))
     .filter(({ coverage, structuralMatches }) => coverage >= minimumCoverage && (structuralMatches > 0 || coverage >= 2))
@@ -308,7 +304,12 @@ function rankDocuments(documents, query) {
     seenSections.add(sectionKey);
     if (selected.length >= MAX_RESULTS) break;
   }
-  return selected.map(({ document, score, coverage }) => ({ ...document, score, coverage }));
+  return selected.map(({ document, score, coverage }) => ({
+    ...document,
+    score,
+    coverage,
+    confidence: coverage / Math.max(queryTokens.length, 1),
+  }));
 }
 
 function documentationDomainBoost(relativePath, query) {

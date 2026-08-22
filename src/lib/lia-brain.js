@@ -21,13 +21,14 @@ function scoreEntry(entry, queryTokens, normalizedQuery) {
   const answer = normalizeKnowledgeText(entry.answer);
   const haystack = new Set(tokens(`${question} ${answer}`));
   const coverage = queryTokens.filter((token) => haystack.has(token)).length;
+  const confidence = coverage / Math.max(queryTokens.length, 1);
   let score = coverage / Math.max(queryTokens.length, 1);
   if (question.includes(normalizedQuery)) score += 2;
   score += queryTokens.filter((token) => question.includes(token)).length * 0.35;
-  return { ...entry, score, coverage };
+  return { ...entry, score, coverage, confidence };
 }
 
-export async function searchKnowledge(query, limit = 1) {
+export async function searchKnowledge(query, limit = 5) {
   const normalizedQuery = normalizeKnowledgeText(query);
   const queryTokens = [...new Set(tokens(normalizedQuery))];
   if (!queryTokens.length) return [];
@@ -46,7 +47,7 @@ export async function searchKnowledge(query, limit = 1) {
 export function isStrongKnowledgeEvidence(entries, query) {
   const queryTokens = [...new Set(tokens(query))];
   if (!queryTokens.length) return false;
-  return entries.some((entry) => entry.score >= 1.5 || entry.coverage >= Math.min(2, queryTokens.length));
+  return entries.some((entry) => (entry.confidence ?? entry.coverage / queryTokens.length) >= 0.6);
 }
 
 export function formatKnowledgeContext(entries = []) {

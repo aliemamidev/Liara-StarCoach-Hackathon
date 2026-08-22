@@ -1,5 +1,5 @@
 import { documentationQueryTokens, matchesDocumentationToken, searchDocumentation, searchDocumentationOnline } from "@/lib/docs-search";
-import { isStrongKnowledgeEvidence, searchKnowledge } from "@/lib/lia-brain";
+import { searchKnowledge } from "@/lib/lia-brain";
 import { searchWeb } from "@/lib/web-search";
 
 export const LIA_STAGES = Object.freeze({
@@ -15,6 +15,7 @@ export const LIA_STAGES = Object.freeze({
 });
 
 const QUERY_TOKEN_PATTERN = /[\p{L}\p{N}]+/gu;
+const MIN_SOURCE_CONFIDENCE = 0.6;
 
 export const CLARIFICATION_MESSAGE = `## پرسش تکمیلی
 
@@ -73,27 +74,29 @@ function hitCoverage(hit, queryTokens) {
   return queryTokens.filter((token) => matchesDocumentationToken(token, haystack)).length;
 }
 
-function scoreHit(hit, queryTokens) {
-  return hit.score || hitCoverage(hit, queryTokens) / Math.max(queryTokens.length, 1);
+function sourceConfidence(hit, query) {
+  const queryTokens = documentationQueryTokens(query);
+  if (!queryTokens.length) return 0;
+  return hitCoverage(hit, queryTokens) / queryTokens.length;
+}
+
+function bestSourceConfidence(hits, query) {
+  return Math.max(0, ...hits.map((hit) => sourceConfidence(hit, query)));
 }
 
 function isStrongEvidence(hits, query) {
-  const queryTokens = documentationQueryTokens(query);
-  if (!queryTokens.length) return false;
-  const requiredCoverage = queryTokens.length <= 2
-    ? 1
-    : queryTokens.length <= 5
-      ? Math.ceil(queryTokens.length * 0.5)
-      : Math.max(2, Math.ceil(queryTokens.length * 0.35));
-  const normalizedQuery = normalizeText(query).toLocaleLowerCase("fa");
-  return hits.some((hit) => {
-    const title = normalizeText(hit.title).toLocaleLowerCase("fa");
-    const coverage = hitCoverage(hit, queryTokens);
-    const structuralText = normalizeText(`${hit.title || ""} ${hit.section || ""} ${hit.path || ""}`).toLocaleLowerCase("fa");
-    const structuralMatch = queryTokens.some((token) => structuralText.includes(token));
-    const exactMatch = normalizedQuery.length > 3 && [title, normalizeText(hit.section), normalizeText(hit.body)].some((value) => value.toLocaleLowerCase("fa").includes(normalizedQuery));
-    return exactMatch || (coverage >= requiredCoverage && (structuralMatch || scoreHit(hit, queryTokens) >= 1.5));
-  });
+  return bestSourceConfidence(hits, query) >= MIN_SOURCE_CONFIDENCE;
+}
+
+function knowledgeConfidence(entry, query) {
+  const queryTokens = [...new Set(tokens(query))];
+  if (!queryTokens.length) return 0;
+  const haystack = new Set(tokens(`${entry.question || ""} ${entry.answer || ""}`));
+  return queryTokens.filter((token) => haystack.has(token)).length / queryTokens.length;
+}
+
+function bestKnowledgeConfidence(entries, query) {
+  return Math.max(0, ...entries.map((entry) => knowledgeConfidence(entry, query)));
 }
 
 function mergeHits(...groups) {
@@ -142,7 +145,7 @@ const QUERY_CONTEXT_REFERENCE_PATTERN = /(?:این|همین|آن|اون|همان
 
 const GENERAL_TECHNICAL_EXPLANATION_PATTERN = /(?:چیست|چیستند|یعنی چه|چه تفاوتی|تفاوت|تعریف|معنی|چگونه کار می\s*کند|چطور کار می\s*کند|چطور(?:\s+\S+){0,8}\s*(?:ایجاد|بساز|ساخت)\s*(?:کنم|کنیم)?|چگونه(?:\s+\S+){0,8}\s*(?:ایجاد|بساز|ساخت)\s*(?:کنم|کنیم)?|توضیح بده|معرفی کن|what is|what are|difference between|how does .* work)/iu;
 const LIARA_SPECIFIC_PATTERN = /(?:لیارا|liara|پنل|قیمت|پلن|صورتحساب|فاکتور|سرویس لیارا|مستندات لیارا|حساب کاربری|دامنه\s*من|دامنه\s*ام|اپلیکیشن\s*من|برنامه\s*ام|در لیارا|روی لیارا)/iu;
-const LIARA_DOCUMENTED_TECHNOLOGY_PATTERN = /(?:api|cli|postgres(?:ql)?|mysql|mongodb|redis|rabbitmq|prisma|sql|dbaas|paas|iaas|node(?:\.js)?|next(?:\.js)?|nest(?:\.js)?|nestjs|react|docker|python|php|github|gitlab|dns|ssl|tls|cors|websocket|cron|متغیر\s+محیطی|environment\s+variable|vercel\s+ai|ai\s+sdk|هوش\s+مصنوعی|چت‌?بات)/iu;
+const LIARA_DOCUMENTED_TECHNOLOGY_PATTERN = /(?:dbaas|paas|iaas|rabbitmq|prisma|nestjs|vercel\s+ai|ai\s+sdk|متغیر\s+محیطی|environment\s+variable)/iu;
 export function isLikelyInScope(query) {
   const normalizedQuery = normalizeText(query);
   return IN_SCOPE_PATTERN.test(normalizedQuery) || TECHNICAL_SYMPTOM_PATTERN.test(normalizedQuery);
@@ -214,6 +217,14 @@ function understandingComplete(query) {
   return detectedService(normalizedQuery) && hasGoal(normalizedQuery) && (!diagnostic || (hasErrorDescription(normalizedQuery) && hasEnvironment(normalizedQuery)));
 }
 
+const SECURITY_RISK_PATTERN = /(?:\brm\s+-rf\b|docker\s+system\s+prune(?:\s+-a)?|\b(?:drop|truncate)\s+(?:database|table|schema|index)\b|\bdelete\s+(?:from|database|table|schema|index|data|records)\b|git\s+(?:push\s+--force(?:-with-lease)?|reset\s+--hard)|kubectl\s+delete\s+.*--all|(?:liara|aws|gcloud)\s+.*\b(?:delete|destroy|terminate)\b|(?:حذف|پاک\s*کردن|پاکسازی|بازنشانی|ریست|overwrite|flush|force\s*push).{0,80}(?:دیتابیس|پایگاه\s*داده|جدول|فایل|اطلاعات|سرویس|داده|حساب|دسترسی|سرور)|(?:دور\s*زدن|bypass).{0,50}(?:امنیت|احراز|مجوز|authentication|authorization|auth)|(?:افشا|نمایش|ارسال|ارائه).{0,50}(?:رمز|password|token|api[_ -]?key|secret|کلید\s*خصوصی|system\s*prompt|پرامپت\s*سیستم))/iu;
+
+function securityRisk(query) {
+  return SECURITY_RISK_PATTERN.test(normalizeText(query))
+    ? { required: true, reason: "security_risk" }
+    : null;
+}
+
 export async function createLiaControllerPlan(messages, settings = {}) {
   const controllerSettings = {
     webSearchEnabled: settings.webSearchEnabled !== false,
@@ -228,11 +239,30 @@ export async function createLiaControllerPlan(messages, settings = {}) {
   const contextQuery = retrievalText(messages, query);
 
   if (isGreeting(query)) {
-    return { mode: LIA_STAGES.ANSWER, stage: LIA_STAGES.ANSWER, query, hits: [], brainHits: [], searchTrace: ["greeting"], metadata: { staticAnswer: GREETING_MESSAGE } };
+    return { mode: LIA_STAGES.ANSWER, stage: LIA_STAGES.ANSWER, query, hits: [], brainHits: [], searchTrace: ["greeting"], classification: "greeting", decision: "static_answer", reason: "greeting", sourceConfidence: 0, metadata: { staticAnswer: GREETING_MESSAGE } };
+  }
+
+  const risk = securityRisk(query);
+  if (risk) {
+    return {
+      mode: LIA_STAGES.ESCALATED,
+      stage: LIA_STAGES.ESCALATED,
+      query,
+      clarifiedQuestion: query.slice(0, 5000),
+      hits: [],
+      brainHits: [],
+      searchTrace: ["security_gate"],
+      classification: "security_risk",
+      decision: "admin_review_required",
+      reason: risk.reason,
+      sourceConfidence: 0,
+      securityRisk: true,
+      metadata: { securityRisk: true, capturedUnknown: false },
+    };
   }
 
   if (!isLikelyInScope(contextQuery)) {
-    return { mode: LIA_STAGES.OUT_OF_SCOPE, stage: LIA_STAGES.OUT_OF_SCOPE, query, hits: [] };
+    return { mode: LIA_STAGES.OUT_OF_SCOPE, stage: LIA_STAGES.OUT_OF_SCOPE, query, hits: [], brainHits: [], searchTrace: [], classification: "out_of_scope", decision: "out_of_scope", reason: "outside_liara_domain", sourceConfidence: 0 };
   }
 
   const generalTechnical = isGeneralTechnicalQuery(contextQuery);
@@ -246,6 +276,10 @@ export async function createLiaControllerPlan(messages, settings = {}) {
         query,
         hits: [],
         searchTrace: [],
+        classification: "liara_diagnostic",
+        decision: "request_screenshot",
+        reason: "visual_diagnosis_required",
+        sourceConfidence: 0,
         metadata: { liaAction: "screenshot", screenshotReason: "برای دیدن خطا یا وضعیت صفحه" },
         message: SCREENSHOT_MESSAGE,
       };
@@ -256,6 +290,10 @@ export async function createLiaControllerPlan(messages, settings = {}) {
       query,
       hits: [],
       searchTrace: [],
+      classification: "liara_diagnostic",
+      decision: "clarify_question",
+      reason: "insufficient_context",
+      sourceConfidence: 0,
       message: buildClarification(contextQuery),
     };
   }
@@ -264,12 +302,25 @@ export async function createLiaControllerPlan(messages, settings = {}) {
   let brainHits = [];
   try {
     const directBrainHits = await searchKnowledge(query);
-    brainHits = isStrongKnowledgeEvidence(directBrainHits, query)
+    brainHits = bestKnowledgeConfidence(directBrainHits, query) >= MIN_SOURCE_CONFIDENCE
       ? directBrainHits
       : await searchKnowledge(retrievalQuery);
   } catch { brainHits = []; }
-  if (isStrongKnowledgeEvidence(brainHits, query) || isStrongKnowledgeEvidence(brainHits, retrievalQuery)) {
-    return { mode: LIA_STAGES.ANSWER, stage: LIA_STAGES.ANSWER, query, hits: [], brainHits, searchTrace, includeSources: !generalTechnical };
+  const brainConfidence = Math.max(bestKnowledgeConfidence(brainHits, query), bestKnowledgeConfidence(brainHits, retrievalQuery));
+  if (brainConfidence >= MIN_SOURCE_CONFIDENCE) {
+    return {
+      mode: LIA_STAGES.ANSWER,
+      stage: LIA_STAGES.ANSWER,
+      query,
+      hits: [],
+      brainHits,
+      searchTrace,
+      classification: "liara_documented",
+      decision: "answer_from_source",
+      reason: "knowledge_source_confident",
+      sourceConfidence: brainConfidence,
+      includeSources: !generalTechnical,
+    };
   }
   brainHits = [];
 
@@ -286,6 +337,7 @@ export async function createLiaControllerPlan(messages, settings = {}) {
   }
 
   if (isStrongEvidence(hits, retrievalQuery)) {
+    const sourceConfidenceValue = Math.max(bestSourceConfidence(hits, query), bestSourceConfidence(hits, retrievalQuery));
     return {
       mode: LIA_STAGES.ANSWER,
       stage: LIA_STAGES.ANSWER,
@@ -293,23 +345,52 @@ export async function createLiaControllerPlan(messages, settings = {}) {
       hits,
       brainHits,
       searchTrace,
+      classification: "liara_documented",
+      decision: "answer_from_source",
+      reason: "documentation_source_confident",
+      sourceConfidence: sourceConfidenceValue,
       includeSources: !generalTechnical,
     };
   }
 
   if (controllerSettings.webSearchEnabled) {
-    searchTrace.push("web");
+    searchTrace.push("liara_web");
     const web = await searchWeb(`${conversation} ${query}`);
     if (web.available) hits = mergeHits(hits, web.hits);
     documentationAvailable = documentationAvailable || web.available;
     if (isStrongEvidence(hits, retrievalQuery)) {
-      return { mode: LIA_STAGES.ANSWER, stage: LIA_STAGES.ANSWER, query, hits, brainHits, searchTrace, includeSources: !generalTechnical };
+      const sourceConfidenceValue = Math.max(bestSourceConfidence(hits, query), bestSourceConfidence(hits, retrievalQuery));
+      return {
+        mode: LIA_STAGES.ANSWER,
+        stage: LIA_STAGES.ANSWER,
+        query,
+        hits,
+        brainHits,
+        searchTrace,
+        classification: "liara_documented",
+        decision: "answer_from_source",
+        reason: "liara_search_source_confident",
+        sourceConfidence: sourceConfidenceValue,
+        includeSources: !generalTechnical,
+      };
     }
   }
 
   if (generalTechnical) {
     if (controllerSettings.probableAnswersEnabled) {
-      return { mode: LIA_STAGES.PROBABLE, stage: LIA_STAGES.PROBABLE, query, hits, brainHits, searchTrace, documentationAvailable };
+      return {
+        mode: LIA_STAGES.PROBABLE,
+        stage: LIA_STAGES.PROBABLE,
+        query,
+        hits,
+        brainHits,
+        searchTrace,
+        classification: "general_technical",
+        decision: "general_safe_answer",
+        reason: "no_internal_source_above_threshold",
+        sourceConfidence: Math.max(bestSourceConfidence(hits, retrievalQuery), brainConfidence),
+        documentationAvailable,
+      };
     }
   }
 
@@ -322,6 +403,10 @@ export async function createLiaControllerPlan(messages, settings = {}) {
     hits,
     brainHits,
     searchTrace,
+    classification: "liara_specific_unverified",
+    decision: unresolvedMode === LIA_STAGES.ESCALATED ? "admin_review_required" : "unanswered",
+    reason: "no_internal_source_above_threshold",
+    sourceConfidence: Math.max(bestSourceConfidence(hits, retrievalQuery), brainConfidence),
     documentationAvailable,
     metadata: { capturedUnknown: controllerSettings.captureUnknownTopics },
   };
@@ -329,7 +414,7 @@ export async function createLiaControllerPlan(messages, settings = {}) {
 
 const INTERNAL_OUTPUT_PATTERN = /system prompt|developer message|internal reasoning|زنجیرهٔ فکر|تحلیل داخلی|پرامپت\s*سیستم|قوانین\s*داخلی|دستورهای\s*داخلی|افشای\s+دستور/i;
 const SECRET_OUTPUT_PATTERN = /(?:api[_-]?key|token|secret|password|رمز(?:\s*عبور)?|کلید(?:\s+خصوصی)?|پسورد)\s*[:=]\s*(?:["'`][^"'`\r\n]{8,}["'`]|(?=[A-Za-z0-9._~+/=-]{20,}(?:\s|$))(?=[A-Za-z0-9._~+/=-]*\d)[A-Za-z0-9._~+/=-]{20,})|\b(?:bearer|basic)\s+(?=[A-Za-z0-9._~+/=-]{20,}(?:\s|$))(?=[A-Za-z0-9._~+/=-]*\d)[A-Za-z0-9._~+/=-]{20,}|(?:postgres(?:ql)?|mysql|mongodb|redis):\/\/[^\s`'"<>]+|-----BEGIN [^-]+ PRIVATE KEY-----/iu;
-const DANGEROUS_COMMAND_PATTERN = /(?:\brm\s+-rf\b|docker\s+system\s+prune(?:\s+-a)?|\b(?:drop|truncate)\s+(?:database|table|schema|index)\b|\bdelete\s+from\b|git\s+push\s+--force(?:-with-lease)?|kubectl\s+delete\s+.*--all|(?:liara|aws|gcloud)\s+.*\b(?:delete|destroy|terminate)\b)/iu;
+const DANGEROUS_COMMAND_PATTERN = /(?:\brm\s+-rf\b|docker\s+system\s+prune(?:\s+-a)?|\b(?:drop|truncate)\s+(?:database|table|schema|index)\b|\bdelete\s+(?:from|database|table|schema|index|data|records)\b|git\s+(?:push\s+--force(?:-with-lease)?|reset\s+--hard)|kubectl\s+delete\s+.*--all|(?:liara|aws|gcloud)\s+.*\b(?:delete|destroy|terminate)\b)/iu;
 
 export function isUnsafeLiaDraft(text) {
   const value = String(text || "");

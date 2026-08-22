@@ -91,8 +91,11 @@ const UNANSWERED_MESSAGE = `## پاسخ
 
 در منابع موجود پاسخ مطمئنی برای این سؤال پیدا نکردم. موضوع برای بررسی‌های بعدی ثبت شد.`;
 
-async function pipeEscalation(response, messages, chatId, plan, contact) {
-  const ticket = await createOrReuseEscalation({ chatId, messages, query: plan.query, clarifiedQuestion: plan.clarifiedQuestion, plan, contact });
+async function pipeEscalation(response, messages, chatId, plan, contact, reason = "") {
+  const escalationPlan = reason
+    ? { ...plan, decision: "admin_review_required", reason }
+    : plan;
+  const ticket = await createOrReuseEscalation({ chatId, messages, query: escalationPlan.query, clarifiedQuestion: escalationPlan.clarifiedQuestion, plan: escalationPlan, contact });
   publishRealtime("escalation.created", { ticketId: ticket.id, chatId });
   return pipeStaticMessage(response, messages, ESCALATION_MESSAGE, LIA_STAGES.ESCALATED, { ticketId: ticket.id });
 }
@@ -149,7 +152,7 @@ export default async function handler(req, res) {
 
     if (plan.mode === LIA_STAGES.ANSWER && plan.brainHits?.length && !plan.hits?.length) {
       const entry = plan.brainHits[0];
-      if (isUnsafeLiaDraft(entry.answer)) return await pipeEscalation(res, messages, chatId, plan);
+      if (isUnsafeLiaDraft(entry.answer)) return await pipeEscalation(res, messages, chatId, plan, undefined, "unsafe_brain_answer");
       await prisma.knowledgeEntry.update({ where: { id: entry.id }, data: { usageCount: { increment: 1 } } }).catch(() => {});
       const answer = entry.answer.trim().startsWith("## پاسخ") ? entry.answer.trim() : `## پاسخ\n\n${entry.answer.trim()}`;
       return await pipeStaticMessage(res, messages, answer, plan.stage, sourceMetadata(plan));
@@ -157,7 +160,7 @@ export default async function handler(req, res) {
 
     const config = getAiConfig();
     if (!isAiConfigured(config)) {
-      return await pipeEscalation(res, messages, chatId, plan);
+      return await pipeEscalation(res, messages, chatId, plan, undefined, "ai_not_configured");
     }
     const provider = createOpenAICompatible({
       name: "liara-router",
@@ -172,7 +175,7 @@ export default async function handler(req, res) {
     }
     if (isUnsafeLiaDraft(answer)) return await pipeStaticMessage(res, messages, UNSAFE_DRAFT_MESSAGE, plan.stage);
     if (!validateLiaDraft(answer)) {
-      return await pipeEscalation(res, messages, chatId, plan);
+      return await pipeEscalation(res, messages, chatId, plan, undefined, "invalid_ai_draft");
     }
     const finalText = answer.trim();
     const responseMetadata = sourceMetadata(plan);

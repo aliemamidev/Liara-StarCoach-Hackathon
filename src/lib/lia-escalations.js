@@ -53,11 +53,17 @@ export function sanitizeAttachments(messages = []) {
 export function summarizeSearchTrace(plan) {
   return {
     stages: plan.searchTrace || [],
+    classification: plan.classification || null,
+    decision: plan.decision || null,
+    reason: plan.reason || null,
+    sourceConfidence: Number(plan.sourceConfidence || 0),
+    securityRisk: plan.securityRisk === true,
     sources: [...(plan.brainHits || []), ...(plan.hits || [])].map((hit) => ({
-      title: hit.title,
+      title: hit.title || hit.question || "منبع داخلی لیارا",
       url: hit.url || "",
-      sourceType: hit.sourceType || "DOCS",
+      sourceType: hit.sourceType || (hit.question ? "ADMIN" : "DOCS"),
       score: hit.score || 0,
+      confidence: Number(hit.confidence || 0),
     })).slice(0, 20),
   };
 }

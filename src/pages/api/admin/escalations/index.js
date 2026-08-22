@@ -7,6 +7,7 @@ function summary(ticket) {
     chatId: ticket.chatId,
     userQuestion: ticket.userQuestion,
     clarifiedQuestion: ticket.clarifiedQuestion,
+    searchTrace: ticket.searchTrace,
     status: ticket.status,
     adminAnswer: ticket.adminAnswer,
     guestName: ticket.guestName,

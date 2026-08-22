@@ -1,10 +1,11 @@
 const DEFAULT_ALLOWED_DOMAINS = ["docs.liara.ir", "liara.ir"];
 
 function allowedDomains() {
-  return (process.env.WEB_SEARCH_ALLOWED_DOMAINS || DEFAULT_ALLOWED_DOMAINS.join(","))
+  const configured = (process.env.WEB_SEARCH_ALLOWED_DOMAINS || DEFAULT_ALLOWED_DOMAINS.join(","))
     .split(",")
     .map((domain) => domain.trim().toLowerCase())
     .filter(Boolean);
+  return configured.filter((domain) => DEFAULT_ALLOWED_DOMAINS.some((allowed) => domain === allowed || domain.endsWith(`.${allowed}`)));
 }
 
 function isAllowedUrl(value) {
